@@ -9,15 +9,15 @@ class WF_Loader{
         return spl_autoload_register(array(__CLASS__, 'autoload'));
     }
 
-    public static function autoload(){
-        if (substr($name, 0, 3) == 'WF_'){
+    public static function autoload($className){
+        if (substr($className, 0, 3) == 'WF_'){
             self::loadClass($className);
             return $className;
         }
         return false;
     }
     
-    public static function loadClass($className, $dirs){
+    public static function loadClass($className, $dirs=null){
         if (class_exists($className) || interface_exists($className)){
             return $className;
         }
@@ -25,10 +25,10 @@ class WF_Loader{
             $dirs = self::$classDirs;
         }
 
-        $script  = str_replace(array('WF_', "_"), array("", DS), $className);
+        $script  = str_replace(array('WF_', "_"), array("", '/'), $className);
         foreach($dirs as $dir){
             $dir = rtrim($dir, '/\\');
-            $file = $dir . DS . $script;
+            $file = $dir . '/' . $script . ".class.php";
             if (file_exists($file)){
                 require $file;
                 if ( class_exists( $className ) ){
