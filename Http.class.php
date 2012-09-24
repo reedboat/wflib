@@ -36,6 +36,15 @@ class WF_Http {
         return $this->request($url, $params, $options);
     }
 
+    public function getJSON($url, $params=array(), $options=array()){
+        $result = false;
+        $resp = $this->request($url, $params, $options);
+        if ($resp){
+            $result = json_decode($resp, true);
+        }
+        return $result;
+    }
+
     public function post($url, $params=array(), $options=array()){
         $options['method'] = 'POST';
         return $this->request($url, $params, $options);
@@ -57,6 +66,7 @@ class WF_Http {
             curl_setopt($ch, CURLOPT_POSTFIELDS, $data); 
             curl_setopt($ch, CURLOPT_POST, true);
         }
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 
         curl_setopt($ch, CURLOPT_URL, $url); 
 
