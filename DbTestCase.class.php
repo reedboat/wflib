@@ -11,7 +11,7 @@ abstract class WF_DbTestCase extends PHPUnit_Framework_TestCase
 
 	public function __get($name)
 	{
-		if(is_array($this->fixtures) && ($rows=$this->_rows($name))!==false)
+		if(is_array($this->fixtures) && ($rows=$this->_rows[$name])!==false)
 			return $rows;
 		else
 			throw new Exception("Unknown property '$name' for class '".get_class($this)."'.");
