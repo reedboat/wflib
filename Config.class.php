@@ -13,6 +13,7 @@ class WF_Config {
         if (is_array($key)){
             $config = $key;    
             self::$_config = array_merge(self::$_config, $config);
+            return true;
         }
         elseif (is_string($key))
         {
