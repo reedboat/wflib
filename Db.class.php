@@ -79,7 +79,6 @@ class WF_Db {
     public function execute($sql, $params=array()){
         $logger = $this->getLogger();
         if (!$this->conn) {
-            $logger = WF_Registry::get('logger');
             $logger->error('connection not exist');
             return false;
         }
@@ -87,14 +86,12 @@ class WF_Db {
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) {
             $logger->error("sql prepare failed '$sql'");
-            $logger->debug("sql prepare failed '$sql'" . $this->conn->errorInfo());
             return false;
         }
 
         $result = $stmt->execute($params);
         if (!$result){
             $logger->error("sql execute failed '$sql (" . implode(', ', $params) . ")'");
-            $logger->debug("sql prepare failed '$sql'" . $this->conn->errorInfo());
         }
         return $result;
     }
