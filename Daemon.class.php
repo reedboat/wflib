@@ -28,6 +28,7 @@ class WF_Daemon {
 
     static public function daemonize($options = array()){
         global $stdin, $stdout, $stderr;
+        set_time_limit(0);
         $default_options = array(
             'user'          => null,
             'output'        => '/dev/null',
@@ -58,9 +59,10 @@ class WF_Daemon {
             //ie. www-data
             $result = self::setUser($options['user']);
             if (!$result) {
-                exit();
+                die("cannot change user");
             }
         }
+
 
         //close file descriptior
         fclose(STDIN);
@@ -70,6 +72,35 @@ class WF_Daemon {
         $stdin  = fopen("/dev/null", 'r');
         $stdout = fopen($output, 'a');
         $stderr = fopen($output, 'a');
+    }
+
+    static public function runAsMainChildren($count=1, $options=array()){
+        self::daemonize($options);
+        $child = 0;
+        while(true){
+            $do_fork = 0;
+            if ($chid < $count){
+                $do_fork = 1;
+                $pid = pcntl_fork();
+            }
+            if ($pid){
+                if ($do_fork) {
+                    $child ++;   
+                }
+                if ($child >= $count){
+                    pcntl_wait($pid, $status);
+                    $child -- ;
+                }
+            }
+            elseif ($pid == 0){
+                unset($child);
+                return;
+            }
+            else {
+                sleep(10);
+            }
+        }
+        exit;
     }
 
     // 启动分发进程 
