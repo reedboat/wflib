@@ -37,6 +37,11 @@ class WF_Logger{
     );
 
     public function log($msg, $level){
+        if ($level == self::TRACE){
+            echo date('r'). " Logger $level $msg\n";   
+            return;
+        }
+
         if ($this->backend == null){
             $msg = date('r'). "$level $msg";
             if ($this->logfile){
@@ -46,25 +51,36 @@ class WF_Logger{
                 error_log($msg);
             }
         }
+        elseif ($this->backend == 'stdout'){
+            echo (date('r'). " Logger $level $msg\n");
+        }
         else {
             $this->backend->log($msg, $level);
         }
     }
 
     public function debug($msg){
-        $this->log($msg, 'DEBUG');
+        $this->log($msg, self::DEBUG);
     }
 
     public function info($msg){
-        $this->log($msg, 'INFO');
+        $this->log($msg, self::INFO);
+    }
+
+    public function emerg($msg){
+        $this->log($msg, self::ERROR);
     }
 
     public function error($msg){
-        $this->log($msg, 'ERROR');
+        $this->log($msg, self::ERROR);
     }
 
     public function warn($msg){
-        $this->log($msg, 'WARN');
+        $this->log($msg, self::WARN);
+    }
+
+    public function trace($msg){
+        $this->log($msg, self::TRACE);
     }
 
     /**
