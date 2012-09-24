@@ -22,8 +22,11 @@ class WF_Xhprof {
      * @return string id
      */
     static function Save($run, $namespace, $root='') {
-        include_once $root . "/xhprof_lib/utils/xhprof_lib.php";
-        include_once $root . "/xhprof_lib/utils/xhprof_runs.php";
+        if ($root){
+            $root = rtrim($root, '/') . '/';
+        }
+        include_once $root . "xhprof_lib/utils/xhprof_lib.php";
+        include_once $root . "xhprof_lib/utils/xhprof_runs.php";
 
         $xhprof = new XHProfRuns_Default;
 
