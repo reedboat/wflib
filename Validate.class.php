@@ -1,7 +1,7 @@
 <?php
 class WF_Validate {
     private $rules = array();
-    public $errors = array();
+    private $errors = array();
     private $messages = array(
         'alpha'           => 'Please provide only alphabetic characters.',
         'choices'         => 'Please provide a valid value.',
@@ -37,6 +37,10 @@ class WF_Validate {
     public function getMessage(){
         $keys = implode(', ', array_keys($this->errors));
         return "Invalid Arguments ($keys)";
+    }
+
+    public function getDetail($key=null){
+        return $key == null ? $this->errors : $this->errors[$key];
     }
 
     /**
