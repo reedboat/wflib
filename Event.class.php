@@ -7,7 +7,7 @@ class WF_Event implements ArrayAccess
     private $name; 
     private $data;
 
-    private static $handlers;
+    private static $handlers = array();
 
     public static function bind($name, $callback){
         if (!isset(self::$handlers[$name])){
@@ -24,6 +24,10 @@ class WF_Event implements ArrayAccess
                     call_user_func($callback,$event);
                 }
                 catch(Exception $e){
+                    $logger = WF_Registry::get('logger');
+                    if ($logger){
+                        $logger->warn("call ".WF_Util::getFuncName($callback). " failed\n");
+                    }
                 }
             }
         }
@@ -88,6 +92,10 @@ class WF_Event implements ArrayAccess
 
     public function data(){
         return $this->data; 
+    }
+
+    public static function clear(){
+        self::$handlers = array();
     }
 }
 ?>
