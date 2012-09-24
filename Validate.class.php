@@ -3,27 +3,27 @@ class WF_Validate {
     private $rules = array();
     public $errors = array();
     private $messages = array(
-        'alpha'           => 'Please enter only alphabetic characters.',
-        'choices'         => 'Please enter a valid value.',
-        'city'            => 'Please enter a valid city name.',
-        'date'            => 'Please enter a valid date.',
-        'dateISO'         => 'Please enter a valid ISO date.',
-        'dateGreaterThan' => 'Please enter a date that is before {date}.',
-        'email'           => 'Please enter a valid email address.',
-        'equalTo'         => 'Please enter the same value again.',
-        'float'           => 'Please enter a valid floating point number.',
-        'length'          => 'Please enter {length} characters.',
-        'max'             => 'Please enter a value less than or equal to {max}.',
-        'maxLength'       => 'Please enter no more than {maxlength} characters.',
-        'min'             => 'Please enter a value greater than or equal to {min}.',
-        'minLength'       => 'Please enter no fewer than {minlength} characters.',
-        'notEqualTo'      => 'Please enter a different value.',
-        'numeric'         => 'Please enter numbers only.',
-        'phone'           => 'Please enter a valid phone number.',
-        'phrase'          => 'Please enter a valid phrase.',
+        'alpha'           => 'Please provide only alphabetic characters.',
+        'choices'         => 'Please provide a valid value.',
+        'city'            => 'Please provide a valid city name.',
+        'date'            => 'Please provide a valid date.',
+        'dateISO'         => 'Please provide a valid ISO date.',
+        'dateGreaterThan' => 'Please provide a date that is before {date}.',
+        'email'           => 'Please provide a valid email address.',
+        'equalTo'         => 'Please provide the same value again.',
+        'float'           => 'Please provide a valid floating point number.',
+        'length'          => 'Please provide {length} characters.',
+        'max'             => 'Please provide a value less than or equal to {max}.',
+        'maxLength'       => 'Please provide no more than {maxlength} characters.',
+        'min'             => 'Please provide a value greater than or equal to {min}.',
+        'minLength'       => 'Please provide no fewer than {minlength} characters.',
+        'notEqualTo'      => 'Please provide a different value.',
+        'numeric'         => 'Please provide numbers only.',
+        'phone'           => 'Please provide a valid phone number.',
+        'phrase'          => 'Please provide a valid phrase.',
         'required'        => 'This field is required.',
-        'url'             => 'Please enter a valid URL.',
-        'zip'             => 'Please enter a valid zip code.',
+        'url'             => 'Please provide a valid URL.',
+        'zip'             => 'Please provide a valid zip code.',
     );
 
     private $keyRules = array(
@@ -32,6 +32,11 @@ class WF_Validate {
 
     public function __construct($rules=array(), $msgs = null){
         $this->rules = $rules;
+    }
+
+    public function getMessage(){
+        $keys = implode(', ', array_keys($this->errors));
+        return "Invalid Arguments ($keys)";
     }
 
     /**
@@ -69,6 +74,9 @@ class WF_Validate {
         foreach($data as $key => $value){
             $this->key = $key;
             $value     = trim($value);
+            if (!isset($this->rules[$key])){
+                continue;
+            }
             $rules     = $this->rules[$key];
             $result    = $this->singleValidate($value, $rules);
             if ($result !== true){
@@ -82,16 +90,21 @@ class WF_Validate {
     public function msg($rule, $key, $value='null'){
         if (is_array($rule)){
             $name = $rule[0];
-            $rule = implode('=', $rule);
         }
         else {
             $name = $rule;
         }
 
         if (array_key_exists($name, $this->messages)){
-           return $this->messages[$name];
+           $msg = $this->messages[$name];
+           if (is_array($rule)){
+               $msg = str_replace('{' . $name . '}', $rule[1], $msg);
+           }
+           return "Param '$key' Error: " . $msg;
         }
-        return "$key Error, Expected:$rule, Actual: $value";
+
+        $rule = implode('=', $rule);
+        return "Param '$key' Error: expected '$rule' but actual '$value'";
     }
 
     public function singleValidate($value, $rules, $func=null){
@@ -281,6 +294,14 @@ class WF_Validate {
     public function aBoolean($value){
         $value = strtolower($value);
         return $value == 1 || $value == 'true' || $value == 'on' || $value == 'yes';
+    }
+
+    public function notempty($value){
+        return $value !== '';
+    }
+
+    public function string($value){
+        return is_string($value);
     }
 }
 ?>
