@@ -77,8 +77,9 @@ class WF_Db {
     }
 
     public function execute($sql, $params=array()){
-        $logger = $this->getLogger();
+        $logger = WF_Registry::get('logger');
         if (!$this->conn) {
+            $logger = WF_Registry::get('logger');
             $logger->error('connection not exist');
             return false;
         }
@@ -86,31 +87,35 @@ class WF_Db {
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) {
             $logger->error("sql prepare failed '$sql'");
+            $logger->error("db error:" . $this->conn->errorCode() . ' ' . json_encode($this->conn->errorInfo()));
             return false;
         }
 
         $result = $stmt->execute($params);
         if (!$result){
             $logger->error("sql execute failed '$sql (" . implode(', ', $params) . ")'");
+            $logger->error("db error:" . $stmt->errorCode() . ' ' . json_encode($stmt->errorInfo()));
         }
+        $stmt->closeCursor();
         return $result;
     }
 
     public function query($sql, $params=array()){
-        $logger = $this->getLogger();
+        //echo ("sql execute failed '$sql (" . implode(', ', $params) . ")'"), "\n";
+        $logger = WF_Registry::get('logger');
         if (!$this->conn) {
             return false;
         }
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) {
             $logger->error("sql prepare failed '$sql'");
-            $logger->debug("sql prepare failed '$sql'" . $this->conn->errorInfo());
+            $logger->error("db error:" . $this->conn->errorCode() . ' ' . json_encode($this->conn->errorInfo()));
             return false;
         }
         $result = $stmt->execute($params);
         if (!$result){
             $logger->error("sql execute failed '$sql (" . implode(', ', $params) . ")'");
-            $logger->debug("sql prepare failed '$sql'" . $this->conn->errorInfo());
+            $logger->error("db error:" . $stmt->errorCode() . ' ' . json_encode($stmt->errorInfo()));
         }
         return $stmt;
     }

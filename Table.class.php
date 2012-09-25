@@ -244,6 +244,7 @@ class WF_Table {
         $sql  = 'select * from ' . $this->tableName() . " WHERE {$this->primaryKey}=?";
         $stmt = $this->db()->query($sql, array($pk));
         $data = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($stmt){ $stmt->closeCursor(); }
         if (!isset($options['model']) || $options['model'] == true){
             return $this->populateRecord($data);
         }
@@ -262,6 +263,7 @@ class WF_Table {
         $sql .= ' LIMIT 1';
         $stmt = $this->db()->query($sql, array_values($attributes));
         $data = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : false;
+        if ($stmt){ $stmt->closeCursor(); }
         if (!isset($options['model']) || $options['model'] == true){
             return $this->populateRecord($data);
         }
@@ -279,6 +281,7 @@ class WF_Table {
         $sql.= implode(" AND ", $conditions);
         $stmt = $this->db()->query($sql, array_values($attributes));
         $data = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : false;
+        if ($stmt){ $stmt->closeCursor(); }
         if (!isset($options['model']) || $options['model'] == true){
             return $this->populateRecords($data);
         }
@@ -304,6 +307,7 @@ class WF_Table {
         $params = isset($condition['params']) ? $condition['params'] : array();
         $stmt = $this->db()->query($sql, $params);
         $data = $stmt? $stmt->fetchAll(PDO::FETCH_ASSOC) : false;
+        if ($stmt){ $stmt->closeCursor(); }
 
         if (!isset($options['model']) || $options['model'] == true){
             return $this->populateRecords($data);
@@ -315,6 +319,7 @@ class WF_Table {
     {
         $stmt = $this->db()->query($sql, $data);
         $data = $stmt? $stmt->fetchAll(PDO::FETCH_ASSOC) : false;
+        if ($stmt){ $stmt->closeCursor(); }
         if (!isset($options['model']) || $options['model'] == true){
             return $this->populateRecords($data);
         }
