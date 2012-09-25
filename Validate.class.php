@@ -4,7 +4,6 @@ class WF_Validate {
     private $errors = array();
     private $messages = array(
         'alpha'           => 'Please provide only alphabetic characters.',
-        'choices'         => 'Please provide a valid value.',
         'city'            => 'Please provide a valid city name.',
         'date'            => 'Please provide a valid date.',
         'dateISO'         => 'Please provide a valid ISO date.',
@@ -14,9 +13,9 @@ class WF_Validate {
         'float'           => 'Please provide a valid floating point number.',
         'length'          => 'Please provide {length} characters.',
         'max'             => 'Please provide a value less than or equal to {max}.',
-        'maxLength'       => 'Please provide no more than {maxlength} characters.',
+        'maxLength'       => 'Please provide no more than {maxLength} characters.',
         'min'             => 'Please provide a value greater than or equal to {min}.',
-        'minLength'       => 'Please provide no fewer than {minlength} characters.',
+        'minLength'       => 'Please provide no fewer than {minLength} characters.',
         'notEqualTo'      => 'Please provide a different value.',
         'numeric'         => 'Please provide numbers only.',
         'phone'           => 'Please provide a valid phone number.',
@@ -24,6 +23,8 @@ class WF_Validate {
         'required'        => 'This field is required.',
         'url'             => 'Please provide a valid URL.',
         'zip'             => 'Please provide a valid zip code.',
+        'choice'          => 'Please provide a valid value in {choice}.',
+        'list'            => 'Please provide a valid list value.',
     );
 
     private $keyRules = array(
@@ -40,7 +41,31 @@ class WF_Validate {
     }
 
     public function getDetail($key=null){
-        return $key == null ? $this->errors : $this->errors[$key];
+        if ($key == null){
+            $result = array();
+            foreach($this->errors as $key => $error){
+                $result[$key] = $this->msg($error['rule']);
+            }
+        }
+        else {
+            $result = '';
+            if (isset($this->errors[$key])){
+                $result = $this->msg($this->errors[$key]['rule']);
+            }
+        }
+        return $result;
+    }
+
+    public function getDetailString(){
+        $result = "";
+        foreach($this->errors as $key => $error){
+            $result.= "Param \$$key error: " . $this->msg($error['rule']) . " \n";
+        }
+        return $result;
+    }
+
+    public function getStructed(){
+        return $this->errors;
     }
 
     /**
@@ -58,7 +83,7 @@ class WF_Validate {
         foreach($keys as $key => $rules){
             if (in_array('required', $rules)){
                 if (!$this->required($key, $data)){
-                    $this->errors[$key] = $this->msg('required', $key);
+                    $this->error('required', $key);
                     continue;
                 }
             }
@@ -67,7 +92,7 @@ class WF_Validate {
                 if (is_array($rule)) {
                     if ($rule[0] == 'requiredIf' || $rule[0] == 'mutex'){
                         if (!$this->{$rule[0]}($key, $rule[1], $data)){
-                            $this->errors[$key] = $this->msg($rule, $key);
+                            $this->error($rule, $key);
                             break;
                         }
                     }
@@ -84,14 +109,18 @@ class WF_Validate {
             $rules     = $this->rules[$key];
             $result    = $this->singleValidate($value, $rules);
             if ($result !== true){
-                $this->errors[$key] = $this->msg($result, $key, $value);
+                $this->error($result, $key, $value);
             }
         }
 
         return empty($this->errors);
     }
 
-    public function msg($rule, $key, $value='null'){
+    public function error($rule, $key, $value=null){
+        $this->errors[$key] = array('rule'=>$rule, 'value'=>$value);
+    }
+
+    public function msg($rule, $value=null){
         if (is_array($rule)){
             $name = $rule[0];
         }
@@ -100,15 +129,18 @@ class WF_Validate {
         }
 
         if (array_key_exists($name, $this->messages)){
-           $msg = $this->messages[$name];
-           if (is_array($rule)){
-               $msg = str_replace('{' . $name . '}', $rule[1], $msg);
-           }
-           return "Param '$key' Error: " . $msg;
+            $msg = $this->messages[$name];
+            
+            if (is_array($rule)){
+                $msg = str_replace('{' . $name . '}', $rule[1], $msg);
+            }
+            return $msg;
         }
 
-        $rule = implode('=', $rule);
-        return "Param '$key' Error: expected '$rule' but actual '$value'";
+        if (is_array($rule)){
+            $rule = implode('=', $rule);
+        }
+        return "expected '$rule' but actual '$value'";
     }
 
     public function singleValidate($value, $rules, $func=null){
@@ -254,7 +286,7 @@ class WF_Validate {
     }
 
     public function numeric($value){
-	    return preg_match('/^[-+]?([0-9]*\.)?[0-9]+([eE][-+]?[0-9]+)?$/',$value);
+        return preg_match('/^[-+]?([0-9]*\.)?[0-9]+([eE][-+]?[0-9]+)?$/',$value);
     }
 
     public function int($value){

@@ -105,22 +105,60 @@ class ValidateTest extends PHPUnit_Framework_TestCase {
         $validator = new WF_Validate($rules);
         $result = $validator -> validate(array('site'=>'news', 'id'=>'abc'));
         $this->assertFalse($result);
-        $this->assertEquals(array('id'), array_keys($validator->errors));
+        $this->assertEquals(array('id'), array_keys($validator->getDetail()));
 
         $validator = new WF_Validate($rules);
         $result = $validator -> validate(array());
         $this->assertFalse($result);
-        $this->assertEquals(array('site', 'id'), array_keys($validator->errors));
+        $this->assertEquals(array('site', 'id'), array_keys($validator->getDetail()));
 
+    }
+
+    public function testGetError(){
+        $validator = new WF_Validate(array());
+
+        $msg = $validator->msg(array('length', 3));
+        $this->assertContains('3', $msg);
+
+        $validator->error(array('choice', 'xml|html'), 'of');
+        $msg = $validator->getDetail('of');
+        $this->assertContains('in xml|html', $msg);
+
+        $rules = array(
+            'oe' => 'choice=utf-8|gbk|gb2312',
+            'of' => 'choice=xml|json',
+            'site' => 'required maxLength=8 minLength=2',
+            'id' =>'mutex=ids int',
+            'ids'=>'list=,|int',
+        );
         $validator = new WF_Validate($rules);
         $result = $validator -> validate(array('of'=>'html', 'ids'=>'1,2,b', 'site'=>'', 'oe'=>'utf-8'));
         $this->assertFalse($result);
         $expected = array('site', 'ids', 'of');
-        $actual   = array_keys($validator->errors);
+        $actual   = array_keys($validator->getDetail());
         sort($expected);
         sort($actual);
         $this->assertEquals($expected, $actual);
-        var_dump($validator->errors);
+
+
+        $msg = $validator->getDetail();
+        $this->assertTrue(array_key_exists('of', $msg));
+        $this->assertContains('in xml|json', $msg['of']);
+
+        $msg = $validator->getDetail('ids');
+        $this->assertContains('list', $msg);
+
+        $msg = $validator->getMessage();
+        $this->assertContains("Invalid Arguments", $msg);
+        $this->assertContains('site', $msg);
+        $this->assertContains('ids', $msg);
+        $this->assertContains('of', $msg);
+
+        $msg = $validator->getDetailString();
+        $this->assertContains('site', $msg);
+        $this->assertContains('ids', $msg);
+        $this->assertContains('of', $msg);
+        $this->assertContains('Param $site error', $msg);
     }
 }
 ?>
