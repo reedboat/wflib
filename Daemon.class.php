@@ -63,7 +63,6 @@ class WF_Daemon {
             }
         }
 
-
         //close file descriptior
         fclose(STDIN);
         fclose(STDOUT);
@@ -77,9 +76,10 @@ class WF_Daemon {
     static public function runAsMainChildren($count=1, $options=array()){
         self::daemonize($options);
         $child = 0;
+        $status = 0;
         while(true){
             $do_fork = 0;
-            if ($chid < $count){
+            if ($child < $count){
                 $do_fork = 1;
                 $pid = pcntl_fork();
             }

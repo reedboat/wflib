@@ -8,7 +8,7 @@ class WF_Config {
         return isset(self::$_config[$key]) ? self::$_config[$key] : $default;
     }
 
-    public static function set($key, $value=null)
+    public static function set($key, $value)
     {
         if (is_array($key)){
             $config = $key;    
