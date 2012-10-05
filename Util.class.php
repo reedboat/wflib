@@ -68,5 +68,23 @@ class WF_Util{
 
         return true;
     }
+
+    public function getDataByKey($data, $key, $default=null){
+        if (strpos('/', $key) === false){
+            return isset($data[$key]) ? $data[$key] : $default;
+        }
+        else {
+            $tree = explode('/', $key);
+            foreach($tree as $current){
+                if (isset($data[$current])){
+                    $data = $data[$current];
+                }
+                else {
+                    return $default;
+                }
+            }
+            return $data;
+        }
+    }
 }
 ?>
