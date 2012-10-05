@@ -23,11 +23,21 @@ class WF_Daemon {
     );
 
     private static $workers_count = 0;
-    private static $deliver_pid   = 0;
-    private static $options = null;
+    private static $workers_max = 0;
+    private static $workers_min = 0;
+    private static $pid_file = null;
+    private static $info_dir = "/tmp";
+    private $job_handler     = null;
+    private static $main_pid = 0;
+    private static $options  = null;
+
+    public function __construct($options){
+    }
 
     static public function daemonize($options = array()){
         global $stdin, $stdout, $stderr;
+        global $argv;
+
         set_time_limit(0);
         $default_options = array(
             'user'          => null,
@@ -39,13 +49,16 @@ class WF_Daemon {
             die("only run in command line mode\n");
         }
 
+        self::$info_dir = '/tmp/daemon_process';
+        self::$pid_file = self::$info_dir . "/" . substr(basename($argv[0]), 0, -4) . ".pid";
+
+        self::checkPidfile();
+
         umask(0);
 
         if (pcntl_fork() != 0){
             exit();
         }
-
-        declare(ticks = 1);
 
         posix_setsid();
 
@@ -55,13 +68,7 @@ class WF_Daemon {
 
         chdir("/");
 
-        if (!empty($options['user'])){
-            //ie. www-data
-            $result = self::setUser($options['user']);
-            if (!$result) {
-                die("cannot change user");
-            }
-        }
+        self::setUser($options['user']) or  die("cannot change owner");
 
         //close file descriptior
         fclose(STDIN);
@@ -71,145 +78,106 @@ class WF_Daemon {
         $stdin  = fopen("/dev/null", 'r');
         $stdout = fopen($output, 'a');
         $stderr = fopen($output, 'a');
+
+        self::createPidfile();
     }
 
     static public function runAsMainChildren($count=1, $options=array()){
         self::daemonize($options);
-        $child = 0;
+        self::$workers_count = 0;
         $status = 0;
+
+        declare(ticks=1);
+        pcntl_signal(SIGTERM, array(__CLASS__, "signalHandler")); // kill all workers if send kill to main process
+        pcntl_signal(SIGCHLD, array(__CLASS__, "signalHandler")); 
+
         while(true){
-            $do_fork = 0;
-            if ($child < $count){
-                $do_fork = 1;
+            $pid = -1;
+            if (self::$workers_count < $count){
                 $pid = pcntl_fork();
             }
-            if ($pid){
-                if ($do_fork) {
-                    $child ++;   
-                }
-                if ($child >= $count){
-                    pcntl_wait($pid, $status);
-                    $child -- ;
-                }
+
+            if ($pid > 0){
+                self::$workers_count ++;
             }
             elseif ($pid == 0){
-                unset($child);
+                if(isset($options['job_handler'])){
+                    call_user_func($options['job_handler']);
+                }
                 return;
             }
             else {
-                sleep(10);
+                sleep(1);
             }
         }
-        exit;
+        self::mainQuit();
+        exit(0);
     }
 
-    // 启动分发进程 
-    static public function startDeliver($options = array()){
-        $options = array_merge(self::$default_options, $options);
-        self::$options = $options;
-        self::$deliver_pid   = posix_getpid();
+    static public function runAsAutoPool($workers_max=10, $options=array()){
+        self::daemonize($options);
+        $main_pid = posix_getpid();
+
+        self::$workers_max   = $workers_max;
+        self::$workers_min   = 2;
         self::$workers_count = 0;
+        $status = 0;
 
-        //创建工作进程
-        self::createWorkers($options['max_workers']);
-        if (self::isWorker()){
-            return true;
-        }
+        declare(ticks=1);
+        pcntl_signal(SIGTERM, array(__CLASS__, "signalHandler")); // kill all workers if send kill to main process
+        pcntl_signal(SIGCHLD, array(__CLASS__, "signalHandler")); // if worker die, minus children num
+        pcntl_signal(SIGUSR1, array(__CLASS__, "signalHandler")); // if send signal usr1 means busy
 
-        sleep(1);
-        //设置信号处理函数
-        self::handleSignal(1);
-        //设置时钟, 当工作进程过少而任务过多的时候，可以防止pcntl_wait阻塞
-        //pcntl_alarm(self::$options['alarm_time']);
 
         while(true){
-            sleep($options['restart_time']);
-            // 如果从信号处理函数中返回，有可能处于worker进程，需要检查。
-            if (self::isWorker()){
-                //todo 这里有时间差，恢复默认信号可能需要提前
+            $pid = -1;
+            if (self::$workers_count < self::$workers_min){
+                $pid = pcntl_fork();
+            }
+
+            if ($pid > 0){
+                self::$workers_count ++;
+            }
+            elseif ($pid == 0){
+                if(isset($options['job_handler'])){
+                    call_user_func($options['job_handler']);
+                }
                 return;
             }
-            self::notifyBusy(self::$deliver_pid);
+            else {
+                sleep(1);
+                if (posix_getpid() != $main_pid){
+                    _log("run busy $pid");
+                    if(isset($options['job_handler'])){
+                        call_user_func($options['job_handler']);
+                    }
+                    return;
+                }
+            }
         }
+        exit(0);
     }
+
 
     // 向deliver进程发送HUP信号
     public static function notifyBusy($pid = 0) {
         $pid = $pid > 0 ? $pid : posix_getppid();
-        posix_kill($pid, SIGUSR1);
+        if ($pid > 1){
+            posix_kill($pid, SIGUSR1);
+        }
     }
 
-    //deliver进程是否存活
-    static private function IsDeliverAlive(){
-        return posix_getppid() != 1;
-    }
-
-    static private function isWorker(){
-        return self::$deliver_pid == posix_getppid();
-    }
-
-    static private function findWorkersPid($pid){
-        if (empty($pid) || $pid == 1) return array();
-        exec("ps -ef |grep -v grep|awk '$3 == $pid{print $2}'", $output); 
-        //exec 自己会产生一个进程
-        return $output;
-    }
     
-    static private function handleSignal($isDeliver=0){
-        if($isDeliver == 1){
-            declare(ticks=1);
-            //__log("signal xxx in parent".posix_getpid());
-          //pcntl_signal(SIGALRM, array(__CLASS__, "signalHandler"));
-            pcntl_signal(SIGCHLD, array(__CLASS__, "signalHandler"));
-            pcntl_signal(SIGUSR1, array(__CLASS__, "signalHandler"));
-          //pcntl_signal(SIGUSR2, array(__CLASS__, "signalHandler"));
-            
-            pcntl_signal(SIGHUP,  array(__CLASS__, "signalHandler"));
-            pcntl_signal(SIGTERM, array(__CLASS__, "signalHandler"));
-            pcntl_signal(SIGQUIT, array(__CLASS__, "signalHandler"));
-        } else { 
-            //__log("signal default in child".posix_getpid());
-          //pcntl_signal(SIGALRM, SIG_IGN);
-            pcntl_signal(SIGCHLD, SIG_IGN);
-            pcntl_signal(SIGUSR1, SIG_DFL);
-          //pcntl_signal(SIGUSR2, SIG_DFL);
-            
-            pcntl_signal(SIGTERM, SIG_DFL);
-            pcntl_signal(SIGHUP,  SIG_DFL);
-            pcntl_signal(SIGQUIT, SIG_DFL);
-        }
-    }
-
-    static private function createWorkers($count = 1){
-        for ( $i = 0; $i < $count; $i++ ) {
-            $pid = pcntl_fork(); 
-            if ($pid < 0){ 
-                return false;
-            } elseif($pid == 0) {
-                self::handleSignal(0);
-                if (self::$options['job_handler']){
-                    $func = self::$options['job_handler']; 
-                    echo "call func $func\n";
-                    $func();
-                    exit;
-                }
-                return false;
-            } else {
-                self::$workers_count ++;
-            }
-        }
-        return true;
-    }
-
     //信号处理函数， 只在父进程中执行
     static private function signalHandler($signo){
-        //__log("singal trigger $signo");
         switch($signo){
-            //case SIGALRM:
-            //    pcntl_alarm(self::$options['alarm_time']);
-            //    break;
-            case SIGUSR2:
-                //for test
+            case SIGUSR1: //busy
+                if (self::$workers_count < self::$workers_max){
+                    $pid = pcntl_fork(); 
+                    if ($pid > 0){ 
+                        self::$workers_count ++;
+                    }
+                }
                 break;
 
             case SIGCHLD:
@@ -217,45 +185,16 @@ class WF_Daemon {
                         self::$workers_count --;
                 }
                 break;
-            case SIGUSR1:
-                $childs_now = count(self::findWorkersPid(self::$deliver_pid));
-                if ($childs_now != self::$workers_count){
-                    self::$workers_count = $childs_now;
-                }
-                $max = self::$options['max_workers'];
-                $count = self::$workers_count <= 0 ? $max : $max - self::$workers_count;
-                self::createWorkers($count);
-                break;
-
+            case SIGTERM:
             case SIGHUP:
             case SIGQUIT:
-            case SIGTERM:
-                    //__log("term begin");
-                    $workers = self::findWorkersPid(self::$deliver_pid);
-                    //__log($workers);
-                    //__log("term finded workers");
-                    foreach($workers as $worker) {
-                        posix_kill($worker, 9);
-                    }
-                    //__log("term killed workers");
-                    sleep(1);
-                    exit;
+                self::mainQuit();
+                break;
             default:
                 return false;
         }
     }
 
-
-    static private function spawn($script = null){
-        $pid = pcntl_fork();
-        if ($pid < 0 ){
-            return false;
-        } else if ($pid > 0){
-            usleep(500);
-            exit();
-        }
-        return true;
-    }
 
     /**
      * 设置用户ID和组ID 
@@ -263,8 +202,11 @@ class WF_Daemon {
      * @param string $name 
      * @return void
      */
-    static private function setUser($name = 'www-data'){
+    static private function setUser($name){
         $result = false;
+        if (empty($name)){
+            return true;
+        }
         $user = posix_getpwnam($name); 
         if ($user) {
             $uid = $user['uid'];
@@ -275,4 +217,43 @@ class WF_Daemon {
         return $result;
     }
 
+    public function checkPidfile(){
+        if (!file_exists(self::$pid_file)){
+            return true;
+        }
+        $pid = file_get_contents(self::$pid_file);
+        $pid = intval($pid);
+        if (posix_kill($pid, 0)){
+            echo "the daemon proces is running\n";
+        }
+        else {
+            echo "the daemon proces end abnormally\n";
+        }
+        exit(1);
+    }
+
+    public function createPidfile(){
+        if (!is_dir(self::$pid_file)){
+            mkdir(self::$info_dir);
+        }
+        $fp = fopen(self::$pid_file, 'w');
+        fwrite($fp, posix_getpid());
+        fclose($fp);
+        _log("create pid file " . self::$pid_file);
+    }
+
+    public function mainQuit(){
+        if (file_exists(self::$pid_file)){
+            unlink(self::$pid_file);
+            _log("delete pid file " . self::$pid_file);
+        }
+        posix_kill(0, SIGKILL);
+        exit(0);
+    }
+}
+
+if (!function_exists('_log')){
+    function _log($msg){
+        printf("%s\t%d\t%d\t%s\n", date("c"), posix_getpid(), posix_getppid(), $msg);
+    }
 }
