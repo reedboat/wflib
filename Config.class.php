@@ -5,7 +5,22 @@ class WF_Config {
 
     public static function get($key, $default = null)
     {
-        return isset(self::$_config[$key]) ? self::$_config[$key] : $default;
+        if (preg_match('/[\.\/]/', $key) == false){
+            return isset(self::$_config[$key]) ? self::$_config[$key] : $default;
+        }
+        else {
+            $tree = preg_split('/[\.\/]/', $key);
+            $config = self::$_config;
+            foreach($tree as $current){
+                if (isset($config[$current])){
+                    $config = $config[$current];
+                }
+                else {
+                    return $default;
+                }
+            }
+            return $config;
+        }
     }
 
     public static function set($key, $value)
