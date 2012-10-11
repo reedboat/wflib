@@ -70,14 +70,14 @@ class WF_Util{
     }
 
     public function getDataByKey($data, $key, $default=null){
-        if (strpos('/', $key) === false){
+        if (strpos($key, '/') === false){
             return isset($data[$key]) ? $data[$key] : $default;
         }
         else {
             $tree = explode('/', $key);
-            foreach($tree as $current){
-                if (isset($data[$current])){
-                    $data = $data[$current];
+            foreach($tree as $node){
+                if (isset($data[$node])){
+                    $data = $data[$node];
                 }
                 else {
                     return $default;
