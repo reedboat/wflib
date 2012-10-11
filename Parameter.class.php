@@ -1,32 +1,35 @@
 <?php
 class WF_Parameter {
+    const PARAM_ASSOC = 0;
+    const PARAM_ARRAY = 1;
+
     public function extract($data, $keys, $filter_func=null){
-        $result = array();
-        $tmp = '';
-        foreach($keys as $key){
+        $result = $this->fetch($data, $keys, $filter_func);
+        foreach($result as $key => $value){
             global $$key;
-             $tmp = isset($data[$key]) ? $data[$key] : null;
-             if ($filter_func && is_string($tmp)){
-                 $tmp = $filter_func($tmp);
-             }
-             $$key = $tmp;
+            $$key = $value;
         }
     }
 
     /**
-     * fetch 
+     * fetch 获取data中指定key值的参数.
+     *
+     * 如果type指定self::PARAM_ARRAY 
+     * 返回标量数组式的数据，这样可以使用下面的方式获得数据
+     * list($a, $b, $c) = $param->fetch2($data, array('a'=>1, 'b'=>2, 'c'=>3));
+     * 还可以改变key值。
+     * list($page, $size) = $param->fetch2($data, array('p'=>1, 'l'=>20));
      * 
      * @param mixed $data 原数组
-     * @param mixed $keys 如果是普通数组，则直接获取这些keys。如果是关联数组，则还会有改名处理
+     * @param mixed $keys 如果是普通数组，则直接获取这些keys。如果是关联数组，则当不存在的时候提供默认值
      * @param mixed $filter_func 过滤函数, 可使用intval等内置函数，也可使用自定义函数，方法等。
      * @access public
      * @return void
      */
-    public function fetch($data, $keys, $filter_func=null){
+    public function fetch($data, $keys, $filter_func=null, $type=self::PARAM_ASSOC){
         $result = array();
-        $flag = array_values($keys) == $keys;
         foreach($keys as $key => $default){
-            if ($flag){
+            if (is_int($key)){
                 $key = $default;
                 $value = isset($data[$key]) ? $data[$key] : null;
             }
@@ -34,11 +37,29 @@ class WF_Parameter {
                 $value = isset($data[$key]) ? $data[$key] : $default;
             }
 
-            if (!is_null($filter_func) && isset($data[$key]) && !is_array($data[$key])) {
-                $value = call_user_func($filter_func, $value);
+            if (!is_null($filter_func) && isset($data[$key])) {
+                $func = $filter_func;
+                if(is_array($filter_func)){
+                    //notice array_key_exists != isset
+                    if(array_key_exists($key, $filter_func)){
+                        $func = $filter_func[$key];
+                    }
+                    else { 
+                        $func = $filter_func[0];
+                    }
+                }
+                if (is_callable($func)){
+                    $value = call_user_func($func, $value);
+                }
             }
+
             $result[$key] = $value;
         }
+
+        if ($type == self::PARAM_ARRAY){
+            return array_values($result);
+        }
+
         return $result;
     }
 
