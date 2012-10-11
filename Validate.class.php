@@ -27,10 +27,6 @@ class WF_Validate {
         'list'            => 'Please provide a valid list value.',
     );
 
-    private $keyRules = array(
-        'requiredif', 'mutex','required', 'equalTo', 'notEqualTo' 
-    );
-
     public function __construct($rules=array(), $msgs = null){
         $this->rules = $rules;
     }
@@ -72,17 +68,18 @@ class WF_Validate {
      * validate 核心验证方法
      * 
      * @param mixed $data 
-     * @access public
-     * @return void
+     * @return boolean
      */
     public function validate($data){
-        $this->data = $data;
+        $this->clear();
         $this->rules = $this->parseAllRules($this->rules);
-        $keys = array_diff_key($this->rules, $this->data);
+        $keys = array_diff_key($this->rules, $data);
+        $valid = true;
 
         foreach($keys as $key => $rules){
             if (in_array('required', $rules)){
                 if (!$this->required($key, $data)){
+                    $valid = false;
                     $this->error('required', $key);
                     continue;
                 }
@@ -92,6 +89,7 @@ class WF_Validate {
                 if (is_array($rule)) {
                     if ($rule[0] == 'requiredIf' || $rule[0] == 'mutex'){
                         if (!$this->{$rule[0]}($key, $rule[1], $data)){
+                            $valid = false;
                             $this->error($rule, $key);
                             break;
                         }
@@ -107,19 +105,33 @@ class WF_Validate {
                 continue;
             }
             $rules     = $this->rules[$key];
-            $result    = $this->singleValidate($value, $rules);
-            if ($result !== true){
-                $this->error($result, $key, $value);
+            foreach($rules as $rule){
+                $result    = $this->singleValidate($value, $rule);
+                if (!$result){
+                    $this->error($rule, $key, $value);
+                    $valid = false;
+                    break;
+                }
             }
         }
 
-        return empty($this->errors);
+        return $valid;
     }
 
+    public function clear(){
+        $this->errors = array();
+    }
+
+    /**
+     * error 设定错误
+     */
     public function error($rule, $key, $value=null){
         $this->errors[$key] = array('rule'=>$rule, 'value'=>$value);
     }
 
+    /**
+     * msg 转换错误信息
+     */
     public function msg($rule, $value=null){
         if (is_array($rule)){
             $name = $rule[0];
@@ -130,7 +142,7 @@ class WF_Validate {
 
         if (array_key_exists($name, $this->messages)){
             $msg = $this->messages[$name];
-            
+
             if (is_array($rule)){
                 $msg = str_replace('{' . $name . '}', $rule[1], $msg);
             }
@@ -143,32 +155,37 @@ class WF_Validate {
         return "expected '$rule' but actual '$value'";
     }
 
-    public function singleValidate($value, $rules, $func=null){
-        foreach($rules as $rule){
-            if (is_array($rule)){
-                $method = $rule[0];
-                $params = array($value, $rule[1]);
-            }
-            else {
-                $method = $rule;
-                $params = array($value);
-            }
-
-            if ($method == 'list'){
-                $method = 'a' . ucfirst($method);
-            }
-
-            if (in_array($method, array('required', 'requiredIf', 'mutex'))){
-                continue;
-            }
-
-
-            $result = call_user_func_array(array($this, $method), $params);
-            if (!$result){
-                return $rule;
-            }
+    /**
+     * singleValidate 
+     * 
+     * @param mixed $value 
+     * @param mixed $rules 
+     * @param mixed $func 
+     * @return true
+     */
+    public function singleValidate($value, $rule, $func=null){
+        if (is_array($rule)){
+            $method = $rule[0];
+            $params = array($value, $rule[1]);
         }
-        return true;
+        else {
+            $method = $rule;
+            $params = array($value);
+        }
+
+        //部分方法为php关键字，使用前缀a处理
+        if (in_array($method, array('list', 'array', 'boolean'))){
+            $method = 'a' . ucfirst($method);
+        }
+
+        //外围已经检验过
+        if (in_array($method, array('required', 'requiredIf', 'mutex'))){
+            return true;
+        }
+
+
+        $result = call_user_func_array(array($this, $method), $params);
+        return $result;
     }
 
     public function parseRule($ruleStr){
@@ -228,19 +245,38 @@ class WF_Validate {
         return $flag == 1;
     }
 
-
-
-
-
-
-
-
     //rules
+
+    private function alnum($value){
+        return ctype_alnum($value);
+    }
 
     private function alpha($value){
         return ctype_alpha($value);
     }
 
+    /**
+     * digit 是否为数字组成
+     */
+    public function digit($value){
+        return ctype_digit($value);
+    }
+
+    /**
+     * word 普通单词，不含特殊符号和空格
+     */
+    public function word($value){
+        $pattern = preg_quote("`~!@#$^&*()=|{}':;,[].<>/?~ ！@#￥……&*（）——|{}【】‘；：”“。，、？　", '/');
+        $result = preg_match("/[${pattern}]/u", $value);
+        return ! $result;
+    }
+
+    /**
+     * vname 是否为合法的变量名，字母或者下划线开头，后跟字母、下划线或者数字
+     */
+    public function vname($value){
+        return preg_match('/^[a-z_]\w*$/i', $value);
+    }
 
     public function choice($value, $choiceStr){
         $valid_choices = $this->split($choiceStr);
@@ -251,7 +287,9 @@ class WF_Validate {
         return strtotime($value) > 0;
     }
 
+    //是否为日期时间格式
     public function datetime($value){
+        return preg_match("/^[\d: \-\/]+$/", $value);
     }
 
     public function time($value){
@@ -285,9 +323,13 @@ class WF_Validate {
         return true;
     }
 
+    /**
+     * numeric 是否是合法数字(含正负数、指数、小数)
+     */
     public function numeric($value){
         return preg_match('/^[-+]?([0-9]*\.)?[0-9]+([eE][-+]?[0-9]+)?$/',$value);
     }
+
 
     public function int($value){
         return preg_match('/^[+-]?\d+$/', $value);
