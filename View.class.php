@@ -23,13 +23,28 @@ class WF_View {
         }
         extract($this->_vars);
 
-        $objfile = "/tmp/" . md5($file);
-        if ( @filemtime($file) >= @filemtime( $objfile ) ){
+        $objfile = "/tmp/tpl_" . md5($file);
+        if ( !file_exists($objfile) || filemtime($file) >= filemtime( $objfile )){
             $content = file_get_contents($file);
-            $content = $this->parse($conten);
+            $content = $this->parse($content);
             file_put_contents($objfile, $content);
         }
+
+        ob_start();
         include $objfile;
+        $content = ob_get_clean();
+
+        return $content;
+    }
+
+    protected function _array_point_expression_parse($match){
+        $data = explode('.', $match[0]);
+        $result = array_shift($data);
+        foreach($data as $item){
+            $key = preg_match('/^\d+$/', $item) ? $item : "'$item'";
+            $result .= "[$key]";
+        }
+        return $result;
     }
 
     public function parse($str){
