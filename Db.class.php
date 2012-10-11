@@ -6,33 +6,7 @@ class WF_Db {
     private static $instance;
 
     public function __construct($db_config=null){
-        if (is_array($db_config) && (isset($db_config['host']) || isset($db_config['dsn']))){
-            if (!isset($db_config['dsn'])) {
-                $this->adapter = isset($db_config['adapter']) ? $db_config['adapter'] : 'mysql';
-                $dsn = $this->adapter . ":host=" . $db_config['host'] . ";port=" . $db_config['port'];
-                if (isset($db_config['dbname'])){
-                    $dsn .= ";dbname=" . $db_config['dbname'];
-                }
-                $options = array();
-                if ($this->adapter == 'mysql') {
-                    $options = array(
-                        PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES ' . $db_config['enCode'],
-                    );
-                }
-                $this->connect($dsn, $db_config['username'], $db_config['password'], $options);
-            }
-            else {
-                $this->connect($db_config['dsn'], $db_config['username'], $db_config['password'], array());
-                $arr = explode(':', $db_config);
-                $this->adapter = $arr[0];
-            }
-        }
-        elseif (is_string($db_config)){
-            $dsn = $db_config;
-            $username = '';
-            $password = '';
-            $this->connect($dsn, $username, $password);
-        }
+        $this->connect($db_config);
     }
 
     public static function instance($db_config=null){
@@ -62,17 +36,37 @@ class WF_Db {
         return false;
     }
 
-    public function getLogger(){
-        if (!$this->logger){
-            return new WF_Logger();
+    public function connect($db_config){
+        if (is_array($db_config) && (isset($db_config['host']) || isset($db_config['dsn']))){
+            if (!isset($db_config['dsn'])) {
+                $this->adapter = isset($db_config['adapter']) ? $db_config['adapter'] : 'mysql';
+                $dsn = $this->adapter . ":host=" . $db_config['host'] . ";port=" . $db_config['port'];
+                if (isset($db_config['dbname'])){
+                    $dsn .= ";dbname=" . $db_config['dbname'];
+                }
+                $options = array();
+                if ($this->adapter == 'mysql') {
+                    $options = array(
+                        PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES ' . $db_config['enCode'],
+                    );
+                }
+                $this->_connect($dsn, $db_config['username'], $db_config['password'], $options);
+            }
+            else {
+                $this->_connect($db_config['dsn'], $db_config['username'], $db_config['password'], array());
+                $arr = explode(':', $db_config['dsn']);
+                $this->adapter = $arr[0];
+            }
+        }
+        elseif (is_string($db_config)){
+            $dsn = $db_config;
+            $username = '';
+            $password = '';
+            $this->_connect($dsn, $username, $password);
         }
     }
 
-    public function setLogger($logger){
-        $this->logger = $logger;
-    }
-
-    public function connect($dsn, $username='', $password='', $driver_options=array()){
+    private function _connect($dsn, $username='', $password='', $driver_options=array()){
         $this->conn = new PDO($dsn, $username, $password, $driver_options);
     }
 
