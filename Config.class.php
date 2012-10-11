@@ -23,7 +23,7 @@ class WF_Config {
         }
     }
 
-    public static function set($key, $value)
+    public static function set($key, $value=null)
     {
         if (is_array($key)){
             $config = $key;    

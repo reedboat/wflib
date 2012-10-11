@@ -1,278 +1,13 @@
 <?php
-// $Id: view_render_php.php 2552 2009-06-10 14:23:27Z jerry $
-
 /**
- * 定义 QView_Render_PHP 类
- *
- * @link http://qeephp.com/
- * @copyright Copyright (c) 2006-2009 Qeeyuan Inc. {@link http://www.qeeyuan.com}
- * @license New BSD License {@link http://qeephp.com/license/}
- * @version $Id: view_render_php.php 2552 2009-06-10 14:23:27Z jerry $
- * @package mvc
+ * WF_Render 
+ * 
+ * @package WF
+ * @version $id$
+ * @author weiye <zhqm03@gmail.com> 
  */
 
-/**
- * QView_Render_PHP 类实现了视图架构的基础
- *
- * @author zhangqm <zhqm03@gmail.com>
- * @version $Id: view_render_php.php 2552 2012-03-30 14:23:27Z zhangqm $
- * @package mvc
- */
 class WF_Render
-{
-    /**
-     * 视图分析类名
-     *
-     * @var string
-     */
-    protected $_parser_name = 'QView_Render_PHP_Parser';
-
-    /**
-     * 视图文件所在目录
-     *
-     * @var string
-     */
-    public $view_dir;
-
-
-    /**
-     * 要输出的头信息
-     *
-     * @var array
-     */
-    public $headers;
-
-    /**
-     * 视图文件的扩展名
-     *
-     * @var string
-     */
-    public $file_extname = 'php';
-
-    /**
-     * 模板变量
-     *
-     * @var array
-     */
-    protected $_vars;
-
-    /**
-     * 视图
-     *
-     * @var string
-     */
-    protected $_viewname;
-
-    /**
-     * 要使用的布局视图
-     *
-     * @var string
-     */
-    protected $_view_layouts;
-
-    /**
-     * 当前使用的分析器
-     *
-     * @var QView_Render_PHP_Parser
-     */
-    protected $_parser;
-
-    /**
-     * 构造函数
-     *
-     * @param array $config
-     */
-    function __construct(array $config = null)
-    {
-        if (is_array($config))
-        {
-            foreach ($config as $key => $value)
-            {
-                $this->{$key} = $value;
-            }
-        }
-
-        $this->cleanVars();
-    }
-
-
-    /**
-     * 设置视图名称
-     *
-     * @param string $viewname
-     *
-     * @return QView_Render_PHP
-     */
-    function setViewname($viewname)
-    {
-        $this->_viewname = $viewname;
-        return $this;
-    }
-
-    /**
-     * 指定模板变量
-     *
-     * @param string|array $key
-     * @param mixed $data
-     *
-     * @return QView_Render_PHP
-     */
-    function assign($key, $data = null)
-    {
-        if (is_array($key))
-        {
-            $this->_vars = array_merge($this->_vars, $key);
-        }
-        else
-        {
-            $this->_vars[$key] = $data;
-        }
-        return $this;
-    }
-
-    /**
-     * 获取指定模板变量
-     *
-     * @param string
-     *
-     * @return mixed
-     */
-    function getVar($key)
-    {
-        return isset($this->_vars[$key]) ? $this->_vars[$key] : null;
-    }
-
-    /**
-     * 获取所有模板变量
-     *
-     *
-     * @return mixed
-     */
-    function getVars()
-    {
-        return $this->_vars;
-    }
-
-	/**
-     * 清除所有模板变量
-     *
-     * @return QView_Render_PHP
-	 */
-	function cleanVars()
-    {
-        $context = QContext::instance();
-        $this->_vars = array(
-            '_ctx'          => $context,
-            '_BASE_DIR'     => $context->baseDir(),
-            '_BASE_URI'     => $context->baseUri(),
-            '_REQUEST_URI'  => $context->requestUri(),
-        );
-        /*
-        */
-        // FIXED! 全局变量应该放到 控制器抽象类 _before_render() 中
-        //$this->_vars = array();
-        return $this;
-    }
-
-    /**
-     * 渲染视图
-     *
-     * @param string $viewname
-     * @param array $vars
-     * @param array $config
-     */
-    function display($viewname = null, array $vars = null, array $config = null)
-    {
-        if (empty($viewname))
-        {
-            $viewname = $this->_viewname;
-        }
-
-        if (Q::ini('runtime_response_header'))
-        {
-            header('Content-Type: text/html; charset=' . Q::ini('i18n_response_charset'));
-        }
-
-        echo $this->fetch($viewname, $vars, $config);
-    }
-
-    /**
-     * 执行
-     */
-    function execute()
-    {
-        $this->display($this->_viewname);
-    }
-
-    /**
-     * 渲染视图并返回渲染结果
-     *
-     * @param string $viewname
-     * @param array $vars
-     * @param array $config
-     *
-     * @return string
-     */
-    function fetch($viewname, array $vars = null, array $config = null)
-    {
-        $this->_before_render();
-        $view_dir = isset($config['view_dir']) ? $config['view_dir'] : $this->view_dir;
-        $extname = isset($config['file_extname']) ? $config['file_extname'] : $this->file_extname;
-        $filename = "{$view_dir}/{$viewname}.{$extname}";
-
-        if (file_exists($filename))
-        {
-            if (!is_array($vars))
-            {
-                $vars = $this->_vars;
-            }
-            if (is_null($this->_parser))
-            {
-                $parser_name = $this->_parser_name;
-                $this->_parser = new $parser_name($view_dir);
-                $this->_parser->extname($this->file_extname);
-            }
-            $output = $this->_parser->assign($vars)->parse($filename);
-        }
-        else
-        {
-            $output = '';
-        }
-
-        $this->_after_render($output);
-        return $output;
-    }
-
-    /**
-     * 渲染之前调用
-     *
-     * 继承类可以覆盖此方法。
-     */
-    protected function _before_render()
-    {
-    }
-
-    /**
-     * 渲染之后调用
-     *
-     * 继承类可以覆盖此方法。
-     *
-     * @param string $output
-     */
-    protected function _after_render(& $output)
-    {
-    }
-
-}
-
-/**
- * QView_Render_PHP_Parser 类实现了视图的分析
- *
- * @author YuLei Liao <liaoyulei@qeeyuan.com>
- * @version $Id: view_render_php.php 2552 2009-06-10 14:23:27Z jerry $
- * @package mvc
- */
-class QView_Render_PHP_Parser
 {
     /**
      * 视图文件扩展名
@@ -308,7 +43,11 @@ class QView_Render_PHP_Parser
      * @var string
      */
     private $_view_dir;
+    private $_layout_dir;
+    private $_helper_dir;
+    private $_control_dir;
 
+    private $_compile_dir;
 
     //todo add vars
     private $begin_mark = '<{';
@@ -322,17 +61,40 @@ class QView_Render_PHP_Parser
         $this->_view_dir = $view_dir;
     }
 
-    /**
-     * 设置分析器已经指定的变量
-     *
-     * @param array $vars
-     *
-     * @return QView_Render_PHP_Parser
-     */
-    function assign(array $vars)
+    public function assign($key, $data = null)
     {
-        $this->_vars = $vars;
+        if (is_array($key))
+        {
+            $this->_vars = array_merge($this->_vars, $key);
+        }
+        else
+        {
+            $this->_vars[$key] = $data;
+        }
         return $this;
+    }
+
+
+    public function display($viewname = null, array $vars = null, array $config = null)
+    {
+        if (empty($viewname))
+        {
+            $viewname = $this->_viewname;
+        }
+
+        $charset = defined("CHARSET") ? constant('CHARSET') : 'UTF-8';
+        header('Content-Type: text/html; charset=' . $charset);
+
+        echo $this->fetch($viewname, $vars, $config);
+    }
+
+    public function fetch($viewname, array $vars = null, array $config = null){
+        return $this->assign($vars)->_parse($filename);
+    }
+
+    public function getVar($key)
+    {
+        return isset($this->_vars[$key]) ? $this->_vars[$key] : null;
     }
 
     /**
@@ -340,7 +102,7 @@ class QView_Render_PHP_Parser
      *
      * @return string
      */
-    function extname($extname = null)
+    function _extname($extname = null)
     {
         if ($extname){
             $this->_extname = $extname;
@@ -358,7 +120,7 @@ class QView_Render_PHP_Parser
      *
      * @return string
      */
-    function parse($filename, $view_id = null, array $inherited_stack = null)
+    function _parse($filename, $view_id = null, array $inherited_stack = null)
     {
         if (!$view_id) $view_id = mt_rand();
 
@@ -419,7 +181,7 @@ class QView_Render_PHP_Parser
         {
             // 如果有当前视图是从某个视图继承的，则载入继承视图
             $filename = "{$this->_view_dir}/{$stack['extends']}.{$this->_extname}";
-            return $this->parse($filename, $view_id, $this->_stacks[$this->_current]);
+            return $this->_parse($filename, $view_id, $this->_stacks[$this->_current]);
         }
         else
         {
@@ -530,7 +292,7 @@ class QView_Render_PHP_Parser
      * @param text $str 
      * @return text
      */
-    protected function _parse($str){
+    protected function parseContent($str){
         //将数组引用的圆点替换成中括号和双引号
         $str = preg_replace_callback('/\$[a-z_]\w*(?:\.\w+)+/', array($this, "_array_point_expression_parse"), $str);
 
@@ -542,27 +304,39 @@ class QView_Render_PHP_Parser
         $str = str_replace( array( $this->begin_mark, $this->end_mark), array( '<?php ', ' ?>'), $str);
         return $str;
     }
+    
+    private function _path($dir, $filename){
+        switch($dir){
+            case 'scripts':
+            case 'layouts':
+            case 'helper':
+            case 'control':
+                $dir = $this->_view_dir . '/' . $dir;
+            default:
+                $dir = rtrim($dir, '/\/');
+        }
+        if (strpos($filename, $this->_extname) === false){
+            $filename .= '.' . $this->_extname;
+        }
+        return $dir . '/' . $filename;
+    }
 
 
     /**
      * 载入视图文件
      */
-    protected function _include($___filename, array $___vars = null)
+    protected function _include($filename, array $vars = null)
     {
-        //$this->_extname = pathinfo($___filename, PATHINFO_EXTENSION);
-        if (strpos($___filename, $this->_extname) === false){
-            $___filename .= '.' . $this->_extname;
-        }
-        if (substr($___filename, 0, 1) !== '/'){
-            $___filename = rtrim($this->_view_dir, '/') . '/scripts/' . ltrim($___filename, '/');
+        if (substr($filename, 0, 1) !== '/'){
+            $filename = $this->_path('scripts', $filename);
         }
 
         extract($this->_vars);
-        if (is_array($___vars)) extract($___vars);
-        $objfile = ROOT_DIR . "/_tmp/compiled/" . md5( $___filename) . '.' . $this->_extname;
-        if ( @filemtime($___filename  ) >= @filemtime( $objfile ) ){
-            $str = file_get_contents($___filename);
-            $str = $this->_parse($str);
+        if (is_array($vars)) extract($vars);
+        $objfile = $this->_compile_dir . '/' . md5( $filename) . '.' . $this->_extname;
+        if ( @filemtime($filename  ) >= @filemtime( $objfile ) ){
+            $str = file_get_contents($filename);
+            $str = $this->parseContent($str);
             $fh = fopen($objfile, "w+");
             fwrite($fh, $str);
             fclose($fh);
@@ -576,13 +350,15 @@ class QView_Render_PHP_Parser
 
     protected function _helper($method, $params){
         $result = "";
-        $helper_file = $this->_view_dir . "/plugins/" . $method . ".php";
         if (function_exists($method)){
             $result = call_user_func_array($method, $params);
         }
         else if (file_exists($helper_file)){
+            $helper_file = $this->_path('plugins', $method . ".php");
              include_once $helper_file;
             $result = call_user_func_array($method, $params);
+        } else {
+            throw new RuntimeException("helper $method doesn't exist");
         }
         return $result;
     }
