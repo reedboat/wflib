@@ -15,7 +15,7 @@ class ParameterTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals('2 ', $b);
         $this->assertEquals(null, $d);
 
-        $model->extract($get, array('a', 'b', 'c', 'd'), 'trim');
+        $model->extract($get, array('a', 'b', 'c', 'd'), array('trim', 'c'=>null));
         $this->assertEquals('1', $a);
         $this->assertEquals('2', $b);
         $this->assertEquals(array(3, 4, 5), $c);
@@ -26,7 +26,7 @@ class ParameterTest extends PHPUnit_Framework_TestCase {
         $get = array(
             'a' => '1',
             'b' => '2 ',
-            'c' => array(3,4,5),
+            'c' => 3,
             'd' => ' 6',
         );
         $model = new WF_Parameter();
@@ -35,11 +35,16 @@ class ParameterTest extends PHPUnit_Framework_TestCase {
             array(
                'a' => '1',
                'b' => '2',
-               'c' => array(3, 4, 5),
+               'c' => 3,
                'e' => null
             ),
             $data
         );
+
+        $default = array('a', 'b'=>'b2', 'c', 'e'=> 'e5');
+        list($a, $b, $c, $e) = $model->fetch($get, $default, 'trim', WF_Parameter::PARAM_ARRAY);
+        $this->assertEquals(trim($get['b']), $b);
+        $this->assertEquals(trim($default['e']), $e);
     }
 }
 ?>
