@@ -1,33 +1,27 @@
 <?php
 /*
- * MXDaemon 后台脚本控制类
+ * WF_Daemon 后台脚本控制类
  *
- * MXDaemon使用方法:
- * 直接在后台代码前面加上 MXDaemon::daemonize();
- * 如果希望多个进程跑，则使用MXDeamon::startDeliver($options);
+ * WF_Daemon使用方法:
+ * 直接在后台代码前面加上 WF_Daemon::daemonize();
+ * 如果希望多个进程跑，则使用MXDeamon::runAsMainChildren($count, $options);
+ * 如果希望根据任务情况自动调整进程数量，则使用MXDeamon::runAsAutoPool($max, $options);
  * $options中可控制最大进程数、等待时间等。
  * 工作进程中，可通过长期空闲的时候自己退出，
  * 任务过多的时候向父进程发起HUP信号
  * 来控制合适的工作进程数。
+ * 可使用getopt 读取控制台选项
  *
  * @author zhangqm <zhqm03@gmail.com>
- * @date 2012-03-08
+ * @date 2012-09-26
  */
 class WF_Daemon { 
-    private static $default_options = array(
-        'max_workers'  => 5,  //最大worker数量
-        'restart_time' => 90, //全部wokers死亡后重启等待时间
-//      'alarm_time'   => 90, //时钟信号时间
-        'pid_file'     => null,
-        'job_handler'  => null,
-    );
 
     private static $workers_count = 0;
     private static $workers_max = 0;
     private static $workers_min = 0;
     private static $pid_file = null;
-    private static $info_dir = "/tmp";
-    private $job_handler     = null;
+    private static $info_dir = null;
     private static $main_pid = 0;
     private static $options  = null;
 
@@ -49,10 +43,16 @@ class WF_Daemon {
             die("only run in command line mode\n");
         }
 
-        self::$info_dir = '/tmp/daemon_process';
-        self::$pid_file = self::$info_dir . "/" . substr(basename($argv[0]), 0, -4) . ".pid";
-
-        self::checkPidfile();
+        if (isset($options['pid'])){
+            if (!isset($options['info_dir'])){
+                self::$info_dir = "/tmp";
+            }
+            else {
+                self::$info_dir = $options['info_dir'];
+            }
+            self::$pid_file = self::$info_dir . "/" .__CLASS__ . "_" . substr(basename($argv[0]), 0, -4) . ".pid";
+            self::checkPidfile();
+        }
 
         umask(0);
 
@@ -68,7 +68,7 @@ class WF_Daemon {
 
         chdir("/");
 
-        self::setUser($options['user']) or  die("cannot change owner");
+        self::setUser($options['user']) or die("cannot change owner");
 
         //close file descriptior
         fclose(STDIN);
@@ -79,10 +79,32 @@ class WF_Daemon {
         $stdout = fopen($output, 'a');
         $stderr = fopen($output, 'a');
 
-        self::createPidfile();
+        if (isset($options['pid'])){
+            self::createPidfile();
+        }
+    }
+
+    static public function run($mode='worker'){
+        $options = array( 'console' => 1);
+        if ($mode == 'pool'){
+            self::runAsAutoPool(5, $options);
+        }
+        else if($mode = 'worker'){
+            self::runAsMainChildren(1, $options);
+        }
+        else {
+            self::daemonize($options);
+        }
     }
 
     static public function runAsMainChildren($count=1, $options=array()){
+        if (isset($options['console'])){
+            $options = self::getopt($options);
+            if(isset($options['count'])){
+                $count = $options['count'];
+            }
+        }
+
         self::daemonize($options);
         self::$workers_count = 0;
         $status = 0;
@@ -115,11 +137,18 @@ class WF_Daemon {
     }
 
     static public function runAsAutoPool($workers_max=10, $options=array()){
+        if (isset($options['console'])){
+            $options = self::getopt($options);
+            if(isset($options['workers_max'])){
+                $workers_max = $options['workers_max'];
+            }
+        }
+
         self::daemonize($options);
         $main_pid = posix_getpid();
 
         self::$workers_max   = $workers_max;
-        self::$workers_min   = 2;
+        self::$workers_min   = 1;
         self::$workers_count = 0;
         $status = 0;
 
@@ -195,7 +224,6 @@ class WF_Daemon {
         }
     }
 
-
     /**
      * 设置用户ID和组ID 
      * 
@@ -233,10 +261,10 @@ class WF_Daemon {
     }
 
     public function createPidfile(){
-        if (!is_dir(self::$pid_file)){
+        if (!is_dir(self::$info_dir)){
             mkdir(self::$info_dir);
         }
-        $fp = fopen(self::$pid_file, 'w');
+        $fp = fopen(self::$pid_file, 'w') or die("cannot create pid file");
         fwrite($fp, posix_getpid());
         fclose($fp);
         _log("create pid file " . self::$pid_file);
@@ -249,6 +277,54 @@ class WF_Daemon {
         }
         posix_kill(0, SIGKILL);
         exit(0);
+    }
+
+    public function getopt($default=array()){
+        $params = getopt("c:m:u:p::o:d:h"); //child num
+        $options = array();
+        if(isset($params['h'])){
+            self::printHelp();
+            exit(0);
+        }
+        if (isset($params['c'])){
+            $options['count'] = intval($params['c']);
+        }
+        if (isset($params['m'])){
+            $options['workers_max'] = intval($params['m']);
+        }
+        if (isset($params['p'])){
+            $options['pid'] = true;
+        }
+        if (isset($params['d']) && is_dir($params['d'])){
+            $options['info_dir'] = $params['d'];
+        }
+        if (isset($params['u'])){
+            $options['user'] = $params['u'];
+        }
+        if (isset($params['o'])){
+            $options['output'] = $params['o'];
+        }
+        return array_merge($default, $options);
+    }
+
+    public function printHelp(){
+        global $argv;
+        $script = $argv[0];
+        echo <<<HELP
+
+Usage:
+   php $script [options] 
+or 
+   php -f $script -- [options]
+    options:
+        -c <n>    -- children num
+        -m <n>    -- max children num
+        -u <user> -- run daemon script as <user>
+        -d <dir>  -- info dir
+        -p        -- use pid file
+        -o <file> -- output info to <file>
+        -h        -- print help
+HELP;
     }
 }
 
