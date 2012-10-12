@@ -3,6 +3,7 @@ class WF_Validate {
     private $rules = array();
     private $errors = array();
     private $messages = array(
+        'alnum'           => 'Please provide only alnum characters.',
         'alpha'           => 'Please provide only alphabetic characters.',
         'city'            => 'Please provide a valid city name.',
         'date'            => 'Please provide a valid date.',
@@ -25,6 +26,7 @@ class WF_Validate {
         'zip'             => 'Please provide a valid zip code.',
         'choice'          => 'Please provide a valid value in {choice}.',
         'list'            => 'Please provide a valid list value.',
+        'callback'        => 'Please provide a valid value',
     );
 
     public function __construct($rules=array(), $msgs = null){
@@ -262,21 +264,6 @@ class WF_Validate {
         return ctype_digit($value);
     }
 
-    /**
-     * word 普通单词，不含特殊符号和空格
-     */
-    public function word($value){
-        $pattern = preg_quote("`~!@#$^&*()=|{}':;,[].<>/?~ ！@#￥……&*（）——|{}【】‘；：”“。，、？　", '/');
-        $result = preg_match("/[${pattern}]/u", $value);
-        return ! $result;
-    }
-
-    /**
-     * vname 是否为合法的变量名，字母或者下划线开头，后跟字母、下划线或者数字
-     */
-    public function vname($value){
-        return preg_match('/^[a-z_]\w*$/i', $value);
-    }
 
     public function choice($value, $choiceStr){
         $valid_choices = $this->split($choiceStr);
@@ -296,7 +283,8 @@ class WF_Validate {
     }
 
     public function email($value){
-        return preg_match('/[\w\.]+@[\w\.]{4,}/', $value);
+        //return preg_match('/[\w\.]+@[\w\.]{4,}/', $value);
+        return filter_var($value, FILTER_VALIDATE_EMAIL);
     }
 
     public function length($value, $length){
@@ -340,11 +328,17 @@ class WF_Validate {
     }
 
     public function url($value){
-        return preg_match('/^https?:\/\/[A-Z0-9.-]+\.[A-Z]{2,4}/i', $value) ;
+        //return preg_match('/^https?:\/\/[A-Z0-9.-]+\.[A-Z]{2,4}/i', $value) ;
+        return filter_var($value, FILTER_VALIDATE_URL);
     }
 
     public function ip($value){
-        return preg_match('/(\d{1,3}\.){3}\d{1,3}/', $value);
+        //return preg_match('/(\d{1,3}\.){3}\d{1,3}/', $value);
+        return filter_var($value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4);
+    }
+
+    public function ipv6($value){
+        return filter_var($value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
     }
 
     public function aList($value, $param){
@@ -365,13 +359,18 @@ class WF_Validate {
         return preg_match($pattern, $value);
     }
 
+    public function callback($value, $callback){
+        return call_user_func($callback, $value);
+    }
+
     public function aArray($value){
         return is_array($value);
     }
 
     public function aBoolean($value){
-        $value = strtolower($value);
-        return $value == 1 || $value == 'true' || $value == 'on' || $value == 'yes';
+        //$value = strtolower($value);
+        //return $value == 1 || $value == 'true' || $value == 'on' || $value == 'yes';
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 
     public function notempty($value){
@@ -380,6 +379,36 @@ class WF_Validate {
 
     public function string($value){
         return is_string($value);
+    }
+
+    /**
+     * vname 是否为合法的变量名，字母或者下划线开头，后跟字母、下划线或者数字
+     */
+    public function vname($value){
+        return preg_match('/^[a-z_]\w*$/i', $value);
+    }
+
+    /**
+     * chinese 是否全中文。只支持utf-8编码。
+     */
+    public function chinese($value){
+        return preg_match("/^[\u4E00-\u9FA5]*$/u", $value);
+    }
+
+    /**
+     * chinese_alnum  是否全中文或英文数字下划线
+     */
+    public function chinese_alnum($value){
+        return preg_match("/^[\u4E00-\u9FA5\w]*$/u", $value);
+    }
+
+    /**
+     * word 普通单词，不含特殊符号和空格
+     */
+    public function nospecial($value){
+        $pattern = preg_quote("`~!@#$^&*()=|{}':;,[].<>/?~！@#￥……&*（）——|{}【】‘；：”“。，、？", '/');
+        $result = preg_match("/[${pattern}]/u", $value);
+        return ! $result;
     }
 }
 ?>
