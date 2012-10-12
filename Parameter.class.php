@@ -1,7 +1,7 @@
 <?php
 class WF_Parameter {
-    const PARAM_ASSOC = 0;
-    const PARAM_ARRAY = 1;
+    const FETCH_ASSOC = 0;
+    const FETCH_ARRAY = 1;
 
     public function extract($data, $keys, $filter_func=null){
         $result = $this->fetch($data, $keys, $filter_func);
@@ -16,9 +16,9 @@ class WF_Parameter {
      *
      * 如果type指定self::PARAM_ARRAY 
      * 返回标量数组式的数据，这样可以使用下面的方式获得数据
-     * list($a, $b, $c) = $param->fetch2($data, array('a'=>1, 'b'=>2, 'c'=>3));
+     * list($a, $b, $c) = $param->fetch($data, array('a'=>1, 'b'=>2, 'c'=>3), 'trim', WF_Parameter::FETCH_ARRAY);
      * 还可以改变key值。
-     * list($page, $size) = $param->fetch2($data, array('p'=>1, 'l'=>20));
+     * list($page, $size) = $param->fetch($data, array('p'=>1, 'l'=>20), null, WF_Parameter::FETCH_ARRAY);
      * 
      * @param mixed $data 原数组
      * @param mixed $keys 如果是普通数组，则直接获取这些keys。如果是关联数组，则当不存在的时候提供默认值
@@ -26,7 +26,7 @@ class WF_Parameter {
      * @access public
      * @return void
      */
-    public function fetch($data, $keys, $filter_func=null, $type=self::PARAM_ASSOC){
+    public function fetch($data, $keys, $filters=null, $type=self::FETCH_ASSOC){
         $result = array();
         foreach($keys as $key => $default){
             if (is_int($key)){
@@ -37,30 +37,35 @@ class WF_Parameter {
                 $value = isset($data[$key]) ? $data[$key] : $default;
             }
 
-            if (!is_null($filter_func) && isset($data[$key])) {
-                $func = $filter_func;
-                if(is_array($filter_func)){
-                    //notice array_key_exists != isset
-                    if(array_key_exists($key, $filter_func)){
-                        $func = $filter_func[$key];
-                    }
-                    else { 
-                        $func = $filter_func[0];
-                    }
-                }
-                if (is_callable($func)){
-                    $value = call_user_func($func, $value);
-                }
+            if (isset($data[$key])){
+                $filter = $this->getFilter($key, $filters);
+                $value  = $this->filter_var($value, $filter);
             }
 
             $result[$key] = $value;
         }
 
-        if ($type == self::PARAM_ARRAY){
+        if ($type == self::FETCH_ARRAY){
             return array_values($result);
         }
 
         return $result;
+    }
+
+    private function getFilter($key, $filters){
+        $filter = null;
+        if(is_array($filters)){
+            if(array_key_exists($key, $filters)){
+                $filter = $filters[$key];
+            }
+            else if(isset($filters[0])){ 
+                $filter = $filters[0];
+            }
+        }
+        else {
+            $filter = $filters;
+        }
+        return $filter;
     }
 
     public function query($key, $default=null, $trim=true){
@@ -72,9 +77,11 @@ class WF_Parameter {
         return $this->retrieve($_POST, $key, $default, $trim);
     }
 
-    public function retrieve($data, $key, $default=null, $trim=true){
-        $value = isset($data[$key]) ? ($trim ? trim($data[$key]) : $data[$key]) : $default;
-        return $value;
+    public function retrieve($data, $key, $default=null, $filter="trim"){
+        if (isset($data[$key])){
+            return $this->filter_var($data[$key], $filter);
+        }
+        return $default;
     }
 
     public function get($key, $default=null, $trim=true){
@@ -83,6 +90,16 @@ class WF_Parameter {
 
     public function cookie($key, $default=null){
         return $this->retrieve($_COOKIE, $key, $default, $false);
+    }
+
+    public function filter_var($value, $filter, $options=null){
+        if ($filter === null) return $value;
+        if (is_callable($filter)){
+            return call_user_func($filter, $value);
+        }
+        if (is_int($filter)){
+            return filter_var($value, $filter, $options);
+        }
     }
 }
 ?>

@@ -42,9 +42,36 @@ class ParameterTest extends PHPUnit_Framework_TestCase {
         );
 
         $default = array('a', 'b'=>'b2', 'c', 'e'=> 'e5');
-        list($a, $b, $c, $e) = $model->fetch($get, $default, 'trim', WF_Parameter::PARAM_ARRAY);
+        list($a, $b, $c, $e) = $model->fetch($get, $default, 'trim', WF_Parameter::FETCH_ARRAY);
         $this->assertEquals(trim($get['b']), $b);
         $this->assertEquals(trim($default['e']), $e);
+    }
+
+    public function testFilter(){
+        $model = new WF_Parameter();
+        $value =' a ';
+        $result = $model->filter_var($value, 'trim');
+        $this->assertEquals(trim($value), $result);
+
+        $result = $model->filter_var($value, null);
+        $this->assertEquals($value, $result);
+
+        $value = "a<b></b>b";
+        $result = $model->filter_var($value, FILTER_SANITIZE_STRIPPED);
+        $this->assertEquals('ab', $result);
+
+        $result = $model->filter_var($value, FILTER_UNSAFE_RAW);
+        $this->assertEquals($value, $result);
+    }
+
+    public function testRetrieve(){
+        $model = new WF_Parameter();
+        $data  = array(
+            'content'=>'a<script></script>b ',
+        );
+
+        $result = $model->retrieve($data, 'content', null, FILTER_SANITIZE_STRIPPED);
+        $this->assertEquals('ab ', $result);
     }
 }
 ?>
