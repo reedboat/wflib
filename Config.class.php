@@ -23,15 +23,13 @@ class WF_Config {
         }
     }
 
-    public static function set($key, $value=null)
-    {
+    public static function set($key, $value=null) {
         if (is_array($key)){
             $config = $key;    
             self::$_config = array_merge(self::$_config, $config);
             return true;
         }
-        elseif (is_string($key))
-        {
+        elseif (is_string($key)) {
             self::$_config[$key] = $value;
             return true;
         }

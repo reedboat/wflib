@@ -37,18 +37,18 @@ class WF_Registry
         return self::has($key);
     }
 
-    #public function instance($key, $className){
-    #    $obj = self::get($key);
+    public function instance($key, $className){
+        $obj = self::get($key);
 
-    #    if ($obj == null){
-    #        $args = func_get_args();
-    #        array_shift($args);
-    #        array_shift($args);
-    #        $rc  = new ReflectionClass($className);
-    #        $obj = $rc->newInstanceArgs($args);
-    #        WF_Registry::set($key, $obj);
-    #    }
-    #    return $obj;
-    #}
+        if ($obj == null){
+            $args = func_get_args();
+            array_shift($args);
+            array_shift($args);
+            $rc  = new ReflectionClass($className);
+            $obj = $rc->newInstanceArgs($args);
+            WF_Registry::set($key, $obj);
+        }
+        return $obj;
+    }
 }
 ?>

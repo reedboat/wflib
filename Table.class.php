@@ -1,7 +1,7 @@
 <?php
 
 class WF_Table {
-    protected $db = null;
+    private $db = null;
     private static $_models = array();
 
     protected $_attributes = array();

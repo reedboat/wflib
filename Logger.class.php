@@ -23,7 +23,13 @@ class WF_Logger{
             $this->backend = $clog;
         }
         elseif (is_string($clog)){
-            $this->logfile = $clog;
+            if ($clog == 'stdout'){
+                $this->backend = $clog;
+            }
+            else {
+                $this->backend = 'file';
+                $this->logfile = $clog;
+            }
         }
     }
 
@@ -42,8 +48,9 @@ class WF_Logger{
             return;
         }
 
-        if ($this->backend == null){
-            $msg = date('r'). "$level $msg";
+        if ($this->backend == "file"){
+            //todo buffer 处理 优化性能
+            $msg = date('r'). "$level $msg\n";
             if ($this->logfile){
                 error_log($msg, 3, $this->logfile);
             }
