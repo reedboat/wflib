@@ -150,32 +150,27 @@ class WF_CacheUtil {
 
         return false;
     }
-        
-    public static function proxy($target, $cache, $options=array()){
-        return new WF_CacheProxy($target, $cache, $options);
-    }
 }
-class WF_CacheProxy {
-    private $key; 
-    private $lifetime;
-    private $policy;
 
-    public function __construct($target, $cache, $options = array()){
-        $this->target = $target;
-        $this->cache  = $cache;
+class WF_CacheProxy {
+    private $obj;
+    private $lifetime=0;
+    private $key=null;
+    private $strategy = 'simple';
+
+    public function __construct($obj, $cache){
+        $this->obj = $obj;
+        $this->cache = $cache;
     }
 
-    public function setCacheParams($key, $lifetime=0, $options=array()){
+    public function setParams($key, $lifetime = 0){
         $this->key = $key;
         $this->lifetime = $lifetime;
     }
 
     public function __call($name, $args){
-        if ($this->type == 'simple'){
-            $options = array();
-            $options['serialize'] = true;
-            return $util->load($this->key, $this->lifetime, array($this->target, $name), $args, $options);
-        }
+        $util = new WF_CacheUtil($this->cache);
+        return $cache->load($this->key, $this->lifetime, array($this->obj, $name), $args);
     }
 }
 ?>

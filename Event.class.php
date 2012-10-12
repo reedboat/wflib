@@ -65,7 +65,7 @@ class WF_Event implements ArrayAccess
         $this->data[$key] = $value;
     }
 
-    public function offsetGet($key, $value){
+    public function offsetGet($key){
         if ($key == 'name'){
             return $this->$key;
         }
@@ -75,7 +75,7 @@ class WF_Event implements ArrayAccess
         return null;
     }
 
-    public function offsetSet($key){
+    public function offsetSet($key, $value){
         if ($key == 'name') return false;
         $this->data[$key] = $value;
         return true;
