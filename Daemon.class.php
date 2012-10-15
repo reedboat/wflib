@@ -84,28 +84,99 @@ class WF_Daemon {
         }
     }
 
-    static public function run($mode='worker'){
-        $options = array( 'console' => 1);
+    static public function run($mode='worker', $options=array()){
+        if (!isset($options['console']) || $options['console']){
+            $options = self::getopt($options);
+        }
+
         if ($mode == 'pool'){
-            self::runAsAutoPool(5, $options);
+            $workers_max = isset($options['workers_max']) ? $options['workers_max'] : 5;
+            self::runAsAutoPool($workers_max, $options);
         }
         else if($mode = 'worker'){
-            self::runAsMainChildren(1, $options);
+            $workers_count = isset($options['workers_count']) ? $options['workers_count'] : 1;
+            self::runAsMainChildren($workers_count, $options);
         }
-        else {
+        else if ($mode == 'daemonize'){
             self::daemonize($options);
         }
     }
 
-    static public function runAsMainChildren($count=1, $options=array()){
-        if (isset($options['console'])){
-            $options = self::getopt($options);
-            if(isset($options['count'])){
-                $count = $options['count'];
+    /**
+     * runJobs 多进程处理特定任务列表, 主进程等待其处理完毕, 可以指定最大的处理进程数.
+     * 方法返回处理成功的任务列表, handler返回true表示成功。
+     * 
+     * @param mixed $jobs 
+     * @param mixed $handler 
+     * @param array $options 
+     * @access public
+     * @return void
+     */
+    public function runJobs($jobs, $handler, $options = array()){
+        if (!is_array($jobs) || !is_callable($handler)){
+            return false;
+        }
+
+
+        $max = isset($options['max']) ? intval($options['max']) : 0;
+        $job_count = count($jobs);
+        $workers = 0;
+        $i = 0;
+        $result = array();
+        $mapper = array();
+
+        while(true){
+            $job = $jobs[$i];
+
+            $pid = pcntl_fork();
+            if ($pid == 0){
+                $result = $handler($job);
+                if ($result){
+                    exit(0);
+                }
+                exit(1);
+            }
+            else if ($pid > 0) {
+                $mapper[$pid] = $i;
+                $i ++;
+                $workers++;
+
+                if ($i >= $job_count){
+                    break;
+                }
+
+                if ($max > 0 && $workers >= $max){
+                    if ($pid = pcntl_waitpid(-1, $status)){
+                        $workers --;
+                        if (pcntl_wifexited($status) && pcntl_wexitstatus($status) === 0){
+                            $result[] = $mapper[$pid]; 
+                        }
+                        while($pid = pcntl_waitpid(-1, $status, WNOHANG)){
+                            if ($pid == -1){
+                                break;
+                            }
+                            $workers --;
+                            if (pcntl_wifexited($status) && pcntl_wexitstatus($status) === 0){
+                                $result[] = $mapper[$pid]; 
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        self::daemonize($options);
+        $status = 0;
+        while($workers > 0){
+            $pid = pcntl_waitpid(-1, $status);
+            if (pcntl_wifexited($status) && pcntl_wexitstatus($status) === 0){
+                $result[] = $mapper[$pid]; 
+            }
+            $workers --;
+        }
+        return $result;
+    }
+
+    static public function runAsMainChildren($count=1, $options=array()){
         self::$workers_count = 0;
         $status = 0;
 
@@ -137,14 +208,6 @@ class WF_Daemon {
     }
 
     static public function runAsAutoPool($workers_max=10, $options=array()){
-        if (isset($options['console'])){
-            $options = self::getopt($options);
-            if(isset($options['workers_max'])){
-                $workers_max = $options['workers_max'];
-            }
-        }
-
-        self::daemonize($options);
         $main_pid = posix_getpid();
 
         self::$workers_max   = $workers_max;
