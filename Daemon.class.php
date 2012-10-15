@@ -90,10 +90,14 @@ class WF_Daemon {
         }
 
         if ($mode == 'pool'){
+            self::daemonize($options);
+
             $workers_max = isset($options['workers_max']) ? $options['workers_max'] : 5;
             self::runAsAutoPool($workers_max, $options);
         }
         else if($mode = 'worker'){
+            self::daemonize($options);
+
             $workers_count = isset($options['workers_count']) ? $options['workers_count'] : 1;
             self::runAsMainChildren($workers_count, $options);
         }
@@ -183,6 +187,8 @@ class WF_Daemon {
         declare(ticks=1);
         pcntl_signal(SIGTERM, array(__CLASS__, "signalHandler")); // kill all workers if send kill to main process
         pcntl_signal(SIGCHLD, array(__CLASS__, "signalHandler")); 
+
+        _log("daemon process is woring now");
 
         while(true){
             $pid = -1;
@@ -314,11 +320,11 @@ class WF_Daemon {
         }
         $pid = file_get_contents(self::$pid_file);
         $pid = intval($pid);
-        if (posix_kill($pid, 0)){
-            echo "the daemon proces is running\n";
+        if ($pid > 0 && posix_kill($pid, 0)){
+            _log("the daemon process is already started");
         }
         else {
-            echo "the daemon proces end abnormally\n";
+            _log("the daemon proces end abnormally, please check pidfile " . self::$pid_file);
         }
         exit(1);
     }
@@ -338,6 +344,7 @@ class WF_Daemon {
             unlink(self::$pid_file);
             _log("delete pid file " . self::$pid_file);
         }
+        _log("daemon process exit now");
         posix_kill(0, SIGKILL);
         exit(0);
     }
@@ -350,7 +357,7 @@ class WF_Daemon {
             exit(0);
         }
         if (isset($params['c'])){
-            $options['count'] = intval($params['c']);
+            $options['workers_count'] = intval($params['c']);
         }
         if (isset($params['m'])){
             $options['workers_max'] = intval($params['m']);
