@@ -46,7 +46,7 @@ class WF_Registry
             array_shift($args);
             $rc  = new ReflectionClass($className);
             $obj = $rc->newInstanceArgs($args);
-            WF_Registry::set($key, $obj);
+            self::set($key, $obj);
         }
         return $obj;
     }

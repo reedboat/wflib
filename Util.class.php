@@ -86,5 +86,42 @@ class WF_Util{
             return $data;
         }
     }
+
+    public function serialize($data, $seperator=null){
+        if (is_string($data)) return $data;
+        $arr = array();
+        foreach($data as $key => $value){
+            if (is_integer($key)){
+                array_push($arr, $value);
+            }
+            else {
+                array_push($arr, strtoupper($key));
+                if (strval($value) === ''){
+                    $value = '-';
+                }
+                array_push($arr, $value);
+            }
+        }
+        if ($seperator == null){
+            $seperator = WF_Config::get('log_seperator', "\t");
+        }
+        return implode($seperator, $arr);
+    }
+
+    public function formatRequest($label){
+        $method = strtoupper($_SERVER['REQUEST_METHOD']);
+        $var_name = "_" . $method;
+        global $$var_name;
+        $param = http_build_query($$var_name);
+        $clientIP = '';
+        if (isset($_SERVER['HTTP_X_FORWARDED_FOR']) && !empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $clientIP = end(explode(',',$_SERVER['HTTP_X_FORWARDED_FOR']));
+        }
+        else if (isset($_SERVER['REMOTE_ADDR'])) {
+            $clientIP = $_SERVER['REMOTE_ADDR'];
+        }
+        $data  = array($clientIP, "HTTP_$method", $label, 'params'=>$param);
+        return self::serialize($data);
+    }
 }
 ?>

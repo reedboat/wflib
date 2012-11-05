@@ -33,37 +33,42 @@ class WF_Validate {
         $this->rules = $rules;
     }
 
-    public function getMessage(){
-        $keys = implode(', ', array_keys($this->errors));
-        return "Invalid Arguments ($keys)";
-    }
-
-    public function getDetail($key=null){
-        if ($key == null){
-            $result = array();
+    public function getMessage($type='basic'){
+        switch($type){
+        case 'basic':
+            $keys = implode(', ', array_keys($this->errors));
+            $msg = "Invalid Arguments ($keys)";
+            break;
+        case 'normal':
+            $result = "";
             foreach($this->errors as $key => $error){
-                $result[$key] = $this->msg($error['rule']);
+                $result.= "Param \$$key error: " . $this->msg($error['rule']) . " \n";
             }
-        }
-        else {
-            $result = '';
-            if (isset($this->errors[$key])){
-                $result = $this->msg($this->errors[$key]['rule']);
+            $msg = $result;
+            break;
+        case 'detail':
+            if ($key == null){
+                $result = array();
+                foreach($this->errors as $key => $error){
+                    $result[$key] = $this->msg($error['rule']);
+                }
             }
+            else {
+                $result = '';
+                if (isset($this->errors[$key])){
+                    $result = $this->msg($this->errors[$key]['rule']);
+                }
+            }
+            $msg = $result;
+            break;
+        case 'structed':
+            $msg = $this->errors;
+            break;
+        default:
+            $msg = 'unknow type';
+            break;
         }
-        return $result;
-    }
-
-    public function getDetailString(){
-        $result = "";
-        foreach($this->errors as $key => $error){
-            $result.= "Param \$$key error: " . $this->msg($error['rule']) . " \n";
-        }
-        return $result;
-    }
-
-    public function getStructed(){
-        return $this->errors;
+        return $msg;
     }
 
     /**

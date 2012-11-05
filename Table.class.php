@@ -395,7 +395,19 @@ class WF_Table {
     protected function beforeDelete(){
         return true;
     }
+
     protected function afterDelete(){
+    }
+
+    public function getLogger(){
+        if ($this->logger){
+            return $this->logger;
+        }
+        return WF_Registry::get('logger');
+    }
+
+    public function setLogger($logger){
+        $this->logger = $logger;
     }
 }
 

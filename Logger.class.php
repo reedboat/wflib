@@ -19,6 +19,7 @@ class WF_Logger{
     private $backend;
     private $logfile;
     private $logdir;
+    private $seperator = "\t";
 
     private $priorities = array(
         self::EMERG  => true,
@@ -40,7 +41,7 @@ class WF_Logger{
             }
             else if(is_dir($clog)){
                 $this->backend = 'dir';
-                $this->logdir = $clog;
+                $this->logdir = rtrim($clog, '/\\');
             }
             else {
                 $this->backend = 'file';
@@ -87,29 +88,33 @@ class WF_Logger{
     }
 
     public function log($msg, $level){
-        if (!$this->priorities[$level]){
+        if (!isset($this->priorities[$level]) || !($this->priorities)){
             return;
         }
 
+        $msg = $this->format($msg);
+        if (is_object($this->backend)) {
+            $this->backend->log($msg, $level);
+            return;
+        }
+
+        $msg = date('c'). " $level $msg\n";
+
         if($this->backend == "file"){
             //todo buffer 处理 优化性能
-            $msg = date('r'). " $level $msg\n";
             if ($this->logfile){
                 error_log($msg, 3, $this->logfile);
             }
         }
         elseif ($this->backend == 'dir'){
-            $file = $this->logdir . "/" . $level . ".log";
+            $file = $this->logdir . "/" . strtolower($level) . ".log";
             error_log($msg, 3, $file);
         }
         elseif ($this->backend == 'stdout'){
-            echo (date('r'). " Logger $level $msg\n");
+            echo $msg;
         }
         else if ($this->backend == 'system'){
             error_log($msg);
-        }
-        else {
-            $this->backend->log($msg, $level);
         }
     }
 
@@ -146,13 +151,14 @@ class WF_Logger{
             return;
         }
         if (is_array($msg)){
-            $msg = $this->format($msg, ' ');
+            $msg = WF_Util::serialize($msg, ' ');
         }
         printf("%s %s %s", date("c"), self::TRACE, $msg);
         if ($trace){
             debug_print_backtrace();
         }
     }
+
 
     /**
      * trace 不仅输出日志，还输出调用栈信息
@@ -164,29 +170,11 @@ class WF_Logger{
         $this->log($msg . "\n" . $trace, self::TRACE);
     }
 
-    /**
-     * format 将数组格式化成Tab分割的字符串序列
-     * 
-     * @param mixed $data 
-     * @access public
-     * @return void
-     */
-    public function format($data, $splitter = "\t"){
-        if (is_string($data)) return $data;
-        $arr = array();
-        foreach($data as $key => $value){
-            if (is_integer($key)){
-                array_push($arr, $value);
-            }
-            else {
-                array_push($arr, strtoupper($key));
-                if (strval($value) === ''){
-                    $value = '-';
-                }
-                array_push($arr, $value);
-            }
+    public function format($data){
+        if (is_array($data)){
+            return WF_Util::serialize($data);
         }
-        return implode($splitter, $arr);
+        return $data;
     }
 }
 ?>

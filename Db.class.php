@@ -72,6 +72,7 @@ class WF_Db {
 
     public function execute($sql, $params=array()){
         $logger = WF_Registry::get('logger');
+        $logger->debug("sql execute: '$sql (" . implode(', ', $params) . ")'");
         if (!$this->conn) {
             $logger = WF_Registry::get('logger');
             $logger->error('connection not exist');
@@ -95,8 +96,8 @@ class WF_Db {
     }
 
     public function query($sql, $params=array()){
-        //echo ("sql execute failed '$sql (" . implode(', ', $params) . ")'"), "\n";
         $logger = WF_Registry::get('logger');
+        $logger->debug("sql query result: '$sql (" . implode(', ', $params) . ")' rowset count:");
         if (!$this->conn) {
             return false;
         }
@@ -108,7 +109,7 @@ class WF_Db {
         }
         $result = $stmt->execute($params);
         if (!$result){
-            $logger->error("sql execute failed '$sql (" . implode(', ', $params) . ")'");
+            $logger->error("sql query failed '$sql (" . implode(', ', $params) . ")'");
             $logger->error("db error:" . $stmt->errorCode() . ' ' . json_encode($stmt->errorInfo()));
         }
         return $stmt;
