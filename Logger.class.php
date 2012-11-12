@@ -12,14 +12,30 @@ class WF_Logger{
     const ERROR   = 'ERROR';     // Error: error conditions
     const WARN    = 'WARN';    // Warning: warning conditions
     const INFO    = 'INFO';    // Informational: informational messages
-    const NOTICE  = 'NOTICE';
+    const NOTICE  = 'NOTICE';  // 记录一些非结构化的基本不是为统计准备的数据。
     const DEBUG   = 'DEBUG';   // Debug: debug messages
     const TRACE   = 'TRACE';   // Trace: debug messages on screen
 
     private $backend;
     private $logfile;
     private $logdir;
-    private $seperator = "\t";
+    private $seperator = " ";
+    private $enable = true;
+
+    /**
+     * log_format 
+     * 
+     * 可供使用的格式串为
+     * %datetime 标准的时间字串 Y-m-d H:i:s
+     * %iso_datetime 2004-02-12T15:19:21+00:00
+     * %micro_time 细致到微秒级
+     * %ip  client_ip
+     * %level 日志级别，大写
+     * @var string
+     * @access private
+     */
+    private $default_log_format = "%iso_datetime %level %msg\n";
+    private $log_format = '';
 
     private $priorities = array(
         self::EMERG  => true,
@@ -50,24 +66,73 @@ class WF_Logger{
         }
     }
 
-    public function setPriorities($levels){
+    public function setSeperator($sep){
+        $this->seperator = $sep;
+    }
+
+    public function setFormat($format){
+        $this->log_format = $format;
+    }
+
+    private function getClientIp(){
+        $client_ip = '0.0.0.0';
+        if (isset($_SERVER['HTTP_X_FORWARDED_FOR']) && !empty($_SERVER['HTTP_X_FORWARDED_FOR']))
+        {
+            $client_ip = end(explode(',',$_SERVER['HTTP_X_FORWARDED_FOR']));
+        }
+        else if (isset($_SERVER['REMOTE_ADDR']))
+        {
+            $client_ip = $_SERVER['REMOTE_ADDR'];
+        }
+        return $client_ip;
+    }
+
+    private function getMcirotime(){
+        list($msec, $sec) = explode(" ", microtime(false));
+        return date("Y-m-d H:i:s", $sec) . $msec;
+    }
+
+
+    /**
+     * enablePriorities 设定记录的级别
+     * 
+     * @param mixed $levels 
+     * @access public
+     * @return void
+     */
+    public function enableLevels($levels){
         $levels = (array)$levels;
         foreach($levels as $level){
             $this->priorities[strtoupper($level)] = true;
         }
     }
 
-    public function disablePriority($levels){
+    /**
+     * disablePriority 取消某些级别的日志
+     * 
+     * @param array $levels 
+     */
+    public function disableLevels($levels){
         $levels = (array)$levels;
         foreach($levels as $level){
             $this->priorities[strtoupper($level)] = false;
         }
     }
 
+    public function getLevels($level = null){
+        if ($level === null){
+            return $this->priorities;
+        }
+        else if (isset($this->priorities[$level])){
+           return $this->priorities[$level];
+        }
+        return null;
+    }
+
     /**
      * setLevel 只有等于或者高于$level级别的日志才被记录
      */
-    public function setLevel($level){
+    public function setPriority($level){
         $enable = true;
         $level  = strtoupper($level);
         foreach($this->priorities as $key => $value){
@@ -82,23 +147,33 @@ class WF_Logger{
      * disable 禁用日志功能
      */
     public function disable(){
-        foreach($this->priorities as $key => $value){
-            $this->priorities[$key] = false;
+        $this->enable = false;
+    }
+
+    private function msg($msg, $level){
+        $msg = $this->format($msg);
+        if (!$this->log_format){
+            return str_replace(array('%iso_datetime', '%level', '%msg'), array(date('c'), $level, $msg), $this->default_log_format);
+        }
+        else {
+            $placeholder = array('%iso_datetime', '%level', '%msg', '%datetime', '%ip', '%micro_time');
+            $data        = array(date('c'), $level, $msg, date("Y-m-d H:i:s"), $this->getClientIp(), $this->getMcirotime());
+            return str_replace($placeholder, $data, $this->log_format);
         }
     }
 
     public function log($msg, $level){
-        if (!isset($this->priorities[$level]) || !($this->priorities)){
+        if (!$this->enable || !isset($this->priorities[$level]) || !($this->priorities[$level])){
             return;
         }
 
-        $msg = $this->format($msg);
         if (is_object($this->backend)) {
+            $msg = $this->format($msg);
             $this->backend->log($msg, $level);
             return;
         }
 
-        $msg = date('c'). " $level $msg\n";
+        $msg = $this->msg($msg, $level);
 
         if($this->backend == "file"){
             //todo buffer 处理 优化性能
@@ -118,14 +193,6 @@ class WF_Logger{
         }
     }
 
-    public function debug($msg){
-        $this->log($msg, self::DEBUG);
-    }
-
-    public function info($msg){
-        $this->log($msg, self::INFO);
-    }
-
     public function emerg($msg){
         $this->log($msg, self::EMERG);
     }
@@ -136,6 +203,18 @@ class WF_Logger{
 
     public function warn($msg){
         $this->log($msg, self::WARN);
+    }
+
+    public function info($msg){
+        $this->log($msg, self::INFO);
+    }
+
+    public function notice($msg){
+        $this->log($msg, self::NOTICE);
+    }
+
+    public function debug($msg){
+        $this->log($msg, self::DEBUG);
     }
 
     /**
@@ -150,10 +229,7 @@ class WF_Logger{
         if (!$this->priorities[self::TRACE]) {
             return;
         }
-        if (is_array($msg)){
-            $msg = WF_Util::serialize($msg, ' ');
-        }
-        printf("%s %s %s", date("c"), self::TRACE, $msg);
+        echo $this->msg($msg, self::TRACE);
         if ($trace){
             debug_print_backtrace();
         }
@@ -167,12 +243,13 @@ class WF_Logger{
         ob_start();
         debug_print_backtrace();
         $trace = ob_get_clean();
+        $msg = $this->format($msg);
         $this->log($msg . "\n" . $trace, self::TRACE);
     }
 
     public function format($data){
         if (is_array($data)){
-            return WF_Util::serialize($data);
+            return WF_Util::serialize($data, $this->seperator);
         }
         return $data;
     }
