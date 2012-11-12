@@ -33,9 +33,11 @@
 /**
  * todo
  */
-class WF_Route {
+class WF_Router {
     private $definitions=array();
     private $tokens = array();
+    private $basepath = '';
+    private $method = array('GET', 'POST', 'PUT', 'DELETE');
 
     private $spec_default = array(
         'name'   => null,
@@ -44,20 +46,21 @@ class WF_Route {
         'conds'  => array(),
         'patterns' => array(),
         '__type' => 'single',
+        'target' => null,
     );
 
-    public function add($path, $name=null, array $params = array())
+    public function map($path, $target=null, $args=array())
     {
-        if (is_array($name)){
-            $params = $name;
-            $name = null;
-        }
-
         $spec = $this->spec_default;
-        $spec['name']= $name;
         $spec['path']= $path;
 
-        foreach($params as $key => $val){
+        if (is_string($target)){
+            list($controller, $action) = explode('#', $target);
+            $target = array('controller'=>$controller, 'action'=>$action);
+        }
+        $spec['target'] = $target;
+
+        foreach($args as $key => $val){
             switch ($key){
             case 'method':
                 $spec['conds']['method'] = strtoupper($val);
@@ -71,27 +74,38 @@ class WF_Route {
         }
 
         $spec = $this->regexp($spec);
+        
 
-        if ($name){
-            $this->definitions[$name] = $spec;
+        if (isset($args['name'])){
+            $this->definitions[$args['name']] = $spec;
         }
         else {
-            $this->definitions[$name] = $spec;
+            $this->definitions[] = $spec;
         }
     }
 
-    public function match($path = null)
+    public function match($path = null, $method=null)
     {
         if ($path == null){
             $path = $_SERVER['REQUEST_URI'];
         }
+
+        if ($method == null){
+            if (isset($_POST['_method']) && ($_method = strtoupper($_POST['_method'])) && in_array($_method,array('PUT','DELETE'))){
+                $method = $_method;
+            }
+            elseif(isset($_SERVER['REQUEST_METHOD'])){
+                $method = $_SERVER['REQUEST_METHOD'];
+            }
+        }
+        $method = strtoupper($method);
+
         foreach($this->definitions as $spec){
             $pattern = $spec['path'];
             $regexp  = $spec['regexp'];
 
             if (isset($spec['conds']['method'])){
-                $method = $spec['conds']['method'];
-                if ($_SERVER['REQUEST_METHOD'] != $method){
+                if ($method != $spec['conds']['method']){
                    continue; 
                 }
             }
@@ -118,7 +132,8 @@ class WF_Route {
                     }
                 }
             }
-            return $data;
+            $spec['values'] = $data;
+            return $spec;
         }
         return false;
     }
@@ -129,6 +144,7 @@ class WF_Route {
         if (substr($path, -2) == "/*"){
             $path = substr($path, 0, -2) . "/{:__wildcard__:.*}";
         }
+
         $find = "/\{:(.*?)(?::(.*?))?\}/";
         preg_match_all($find, $path, $matches, PREG_SET_ORDER);
         foreach($matches as $match){
@@ -136,15 +152,14 @@ class WF_Route {
             $name  = $match[1];
             if (isset($match[2])){
                 $spec['patterns'][$name] = $match[2];
-                $spec['path'] = str_replace($whole, "{:$name}", $path);
+                $path = str_replace($whole, "{:$name}", $path);
             }
             else if (!isset($spec['patterns'][$name])){
                 $spec['patterns'][$name] = "[^/]+";
             }
         }
 
-        $pattern = $spec['path'];
-
+        $pattern = $path;
         $spec['patterns'] = (array) $spec['patterns'];
         $keys = array();
         $vals = array();
@@ -154,6 +169,7 @@ class WF_Route {
         }
         $pattern = str_replace($keys, $vals, $pattern);
         $spec['regexp'] = "#^{$pattern}$#";
+        $spec['path'] = $path;
 
 
         return $spec;
@@ -185,6 +201,16 @@ class WF_Route {
 
     public function __sleep(){
         return array('definitions');
+    }
+}
+
+class WF_Route {
+    private $spec;
+
+    public function __construct($spec){
+        $this->spec = $spec;
+    }
+    public function run(){
     }
 }
 ?>
