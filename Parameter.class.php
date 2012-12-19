@@ -100,6 +100,7 @@ class WF_Parameter {
         if (is_int($filter)){
             return filter_var($value, $filter, $options);
         }
+        return $value;
     }
 }
 ?>

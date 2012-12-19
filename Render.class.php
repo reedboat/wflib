@@ -296,6 +296,9 @@ class WF_Render
         //将数组引用的圆点替换成中括号和双引号
         $str = preg_replace_callback('/\$[a-z_]\w*(?:\.\w+)+/', array($this, "_array_point_expression_parse"), $str);
 
+        // todo add filter replace. "like a.b|fun1:1|fun2" will be replace to "echo fun2(fun1(a['b'], 1));" 
+        // usually we have filters like 'length', 'escape', 'join', and so on
+
         //将变量添加echo 
         $str = preg_replace('/' .$this->begin_mark. '\s*(?:echo\s*)?(\$[^ \s\(\)\.};]+)\s*;?\s*'.$this->end_mark.'/', '<?php echo $1; ?>', $str);
         //替换函数调用,添加echo

@@ -53,13 +53,15 @@ class WF_Http {
     public function request($url, $params = array(), $options = array()){
 
         $ch = $this->ch;
-        $params  = array_merge($this->params, $params);
+        $params  = array_merge($this->params, (array)$params);
         $data    = http_build_query($params, '', '&');
 
         $method = isset($options['method']) 
             ? strtoupper($options['method']) : $this->method;
         if ($method == 'GET'){
-            $url .= (strpos($url, "?") === false ? "?" : "&") . $data;
+            if ($data){
+                $url .= (strpos($url, "?") === false ? "?" : "&") . $data;
+            }
             curl_setopt($ch, CURLOPT_HTTPGET, true);
         }
         elseif ($method == "POST") {
@@ -124,5 +126,32 @@ class WF_Http {
         fputs($fp, $content);
         fclose($fp);
         return true;
+    }
+
+     public function setOption($key, $value){
+         curl_setopt($this->ch, $key, $value);
+     }
+ 
+     public function reset(){
+         $this->ch         = curl_init();
+         $this->http_code  = 200;
+         $this->curl_errno = 0;
+     }
+ 
+    public function fetchPage($url, $use_cache=false){
+        $url_hash = md5($url);
+        $cache_dir = '/tmp/curl/' . substr($url_hash, 0, 2);
+        if (!is_dir($cache_dir)){
+            mkdir($cache_dir, 0777, true);
+        }
+        $cache_file = $cache_dir . "/" . substr($url_hash, 2) . ".html";
+        if ($use_cache && file_exists($cache_file)){
+            return file_get_contents($cache_file);
+        }
+        $html = $this->get($url);
+        if($html && $use_cache){
+            file_put_contents($cache_file, $html);
+        }
+        return $html;
     }
 }

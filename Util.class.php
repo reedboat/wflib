@@ -123,5 +123,10 @@ class WF_Util{
         $data  = array($clientIP, "HTTP_$method", $label, 'params'=>$param);
         return self::serialize($data);
     }
+
+     public function explode($seperator, $str){
+         if ($str == '') return array();
+         return explode($seperator, $str);
+     }
 }
 ?>

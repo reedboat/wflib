@@ -68,11 +68,9 @@ class WF_Extract {
         $subtitle    = mb_substr($title_str, 0, $base_len);
         $offset      = 0;
         $lcs_len     = 0;
-        //echo "\n\n";
         while(true){
             $pos = mb_strpos($html, $subtitle, $offset);
             if ($pos === false) break;
-            echo "start:" . $pos . ":" . mb_substr($html, $pos, 30) . "\n";
             $i   = $base_len;
             $pos += $base_len;
             while(mb_substr($title_str, $i, 1) == mb_substr($html, $pos, 1)){
@@ -81,7 +79,6 @@ class WF_Extract {
                     break;
                 }
             };
-            //echo 'result:' . $i. ':' .mb_substr($html, $pos-$i, $i) . "\n";
             if ($i-1 > $lcs_len) {
                 $lcs_len = $i;
             }
@@ -250,7 +247,6 @@ class WF_Extract {
                 $end = $i - 1;
             }
         }
-        echo "start=$start,end=$end, total=" .count($textLines). "<br />";
         return $text;
     }
 
