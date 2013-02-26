@@ -3,6 +3,27 @@ class WF_View {
     private $begin_mark = '<{';
     private $end_mark   = '}>';
     private $_vars = array();
+    private $view_dir = '';
+    private $compile_dir = '/tmp';
+
+    public function __construct($options = array())
+    {
+        if(isset($options['view_dir'])){
+            $this->view_dir = $options['view_dir'];
+        }
+        if (isset($options['begin_mark'])){
+            $this->begin_mark = $options['begin_mark'];
+        }
+        if (isset($options['end_mark'])){
+            $this->end_mark = $options['end_mark'];
+        }
+        if (isset($options['compile_dir'])){
+            $this->compile_dir = $options['compile_dir'];
+            if (!is_writable($this->compile_dir)){
+                die("no privilge to write in compile_dir\n");
+            }
+        }
+    }
 
     public function assign($key, $data = null)
     {
@@ -18,13 +39,14 @@ class WF_View {
     }
 
     public function render($file, $vars=null){
+        $file = $this->view_dir . $file;
         if (is_array($vars)){
             $this->assign($vars);
         }
         extract($this->_vars);
 
-        $objfile = "/tmp/tpl_" . md5($file);
-        if ( !file_exists($objfile) || filemtime($file) >= filemtime( $objfile )){
+        $objfile = $this->compile_dir . "/tpl_" . md5($file);
+        if ( !file_exists($objfile) || filemtime($file) >= filemtime($objfile)){
             $content = file_get_contents($file);
             $content = $this->parse($content);
             file_put_contents($objfile, $content);
