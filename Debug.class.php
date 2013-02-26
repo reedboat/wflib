@@ -9,11 +9,11 @@ class WF_Debug
      */
     public function enable($level=1) {
         if ($level){
-            ini_set("display_errors", E_ALL & ~E_NOTICE);
-            error_reporting(1);
+            ini_set("display_errors", 1);
+            error_reporting(E_ALL & ~E_NOTICE);
             return true;
         }
-        error_reporting(0);
+        ini_set("display_errors", 0);
     }
 
     /**
