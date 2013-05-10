@@ -47,6 +47,29 @@ class WF_Logger{
         self::TRACE  => false,
     );
 
+    private static $settings = array();
+    private static $instances = array();
+
+    public static function getLogger($name='default')
+    {
+        if(isset(self::$instances[$name])){
+            return self::$instances[$name];
+        }
+        $className = __CLASS__;
+        $logger = new $className();
+        $logger->label = $name;
+        foreach(self::$settings as $key => $value){
+            $logger->$key = $value;
+        }
+        self::$instances[$name] = $logger;
+        return $logger;
+    }
+
+    public static function basicConfig($settings){
+        self::$settings = array_merge(self::$settings, $settings);
+    }
+
+
     public function __construct($clog=null){
         if (is_object($clog)){
             $this->backend = $clog;
@@ -156,8 +179,8 @@ class WF_Logger{
             return str_replace(array('%iso_datetime', '%level', '%msg'), array(date('c'), $level, $msg), $this->default_log_format);
         }
         else {
-            $placeholder = array('%iso_datetime', '%level', '%msg', '%datetime', '%ip', '%micro_time');
-            $data        = array(date('c'), $level, $msg, date("Y-m-d H:i:s"), $this->getClientIp(), $this->getMcirotime());
+            $placeholder = array('%iso_datetime', '%level', '%msg', '%datetime', '%ip', '%micro_time', '%label');
+            $data        = array(date('c'), $level, $msg, date("Y-m-d H:i:s"), $this->getClientIp(), $this->getMcirotime(), $this->label);
             return str_replace($placeholder, $data, $this->log_format);
         }
     }
@@ -253,5 +276,40 @@ class WF_Logger{
         }
         return $data;
     }
+
+    public function __set($key, $value)
+    {
+        switch($key){
+        case 'priority':
+            $this->setPriority($value);
+            break;
+        case 'format':
+            $this->setFormat($value);
+            break;
+        case 'seperator':
+            $this->setSeperator($value);
+            break;
+        case 'label':
+            $this->label = $value;
+            break;
+        case 'dir':
+            $this->backend = 'dir';
+            $this->logdir = rtrim($value, '/\\');
+            if (!is_dir($this->logdir)){
+                $success=@mkdir($this->logdir, 0755, true);
+                if (!$success){
+                    throw new RuntimeException("Logger directory `" . $this->logdir . "` can't be created" );
+                }
+            }
+            break;
+        case 'file':
+            $this->backend = 'file';
+            $this->logfile = rtrim($value, '/\\');
+            break;
+        default:
+            throw new InvalidArgumentException('Logger config error, please check key ' . $key);
+        }
+    }
+
 }
 ?>
