@@ -227,7 +227,30 @@ class WF_Api {
         return $this->prj->rs->data->ext[$ext];
     }
 
+    /**
+     * getResource 获取资源。
+     * 可以直接获取db,cache等
+     * 
+     * @param mixed $key 
+     * @access public
+     * @return void
+     */
+    public function getResource($key){
+        if (strpos($key, '.') === false){
+            $rs_type = $key;
+            $rs_key  = 'primary';
+        }
+        else {
+            list($rs_type, $rs_key) = explode('.', $key);
+        }
+        return $this->prj->rs->$rs_type->$rs_key;
+    }
+
     public function getProject(){
         return $this->prj;
+    }
+
+    public function log($msg, $level='INFO'){
+        $this->prj->CLog->w($leve, $msg);
     }
 }
