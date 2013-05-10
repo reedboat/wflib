@@ -1,4 +1,23 @@
 <?php
+/**
+ * WF_Validate 参数验证类
+ *
+ * #samples
+ * $rules = array(
+ * 'k1' => 'required',//k1参数必选
+ * 'k2' => 'boolean', //k2可传入开关选项，包括0/1, true/false, on/off, yes/no
+ * 'k3' => 'list=,|int',//k3须传入数字列表，用逗号分隔
+ * 'k4' => 'choice=a|b|c',//k4须传入a\b\c几个可选值
+ * 'k5' => 'identifier', //k5须传入标识符，即字母或者下划线开头，后面紧跟字母、数组、下划线等
+ * 'k6' => 'int max=10 min=5', //k6须传入数字，数字范围在5-10之间
+ * 'k7' => 'regexp=/^ftp:\/\/.+$/', //k7须符合正则匹配
+ * # 其他还有日期、字符串、字符串长度、汉字等等验证方法。
+ * )
+ * 
+ * @package 
+ * @version $id$
+ * @author kufazhang <zhqm03@gmail.com> 
+ */
 class WF_Validate {
     private $rules = array();
     private $errors = array();
