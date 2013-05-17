@@ -1,11 +1,12 @@
 <?php
 class WF_Loader{
-    private static $classDirs = array(__DIR__);
+    private static $classDirs = array();
 
     public static function init(){
     }
 
     public static function registerAutoload(){
+        self::$classDirs = array(dirname(__FILE__));
         return spl_autoload_register(array(__CLASS__, 'autoload'));
     }
 
