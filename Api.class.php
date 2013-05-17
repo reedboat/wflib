@@ -105,6 +105,10 @@ class WF_Api {
     public function fetch($keys, $filters=null, $type=WF_Parameter::FETCH_ARRAY){
         $data = $_SERVER['REQUEST_METHOD'] == 'GET' ? $_GET : $_POST;
         $param = new WF_Parameter();
+        if (!is_array($keys)){
+            $result = $param->fetch($data, array($keys), $filters, $type);
+            return array_pop($result);
+        }
         return $param->fetch($data, $keys, $filters, $type);
     }
 

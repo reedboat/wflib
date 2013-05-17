@@ -100,7 +100,15 @@ class WF_Parameter {
         if (is_int($filter)){
             return filter_var($value, $filter, $options);
         }
+        if ($filter == 'json_decode_array'){
+            return json_decode($value, true);
+        }
+        if (substr($filter, 0, 11) == 'explode_by_'){
+            $sep = substr($filter, 11);
+            return explode($sep, $value);
+        }
         return $value;
     }
 }
+
 ?>

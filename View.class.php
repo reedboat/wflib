@@ -51,6 +51,7 @@ class WF_View {
     }
 
     public function display($file, $vars = null){
+        $use_layout = false;
         if (!$this->called){
             if ($this->layout){
                 $use_layout = true;
