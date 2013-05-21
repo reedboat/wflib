@@ -17,7 +17,7 @@ class WF_Extract {
         'author'  => '',
         'desc'    => '',
     );
-    private $default_allow_tags = array('title', 'p', 'div', 'span', 'table', 'tr', 'td', 'ul', 'li', 'ol', 'dt', 'dl', 'dd', "h1", "h2", "h3", "h4", "a");
+    private $default_allow_tags = array('title', 'p', 'div', 'span', 'table', 'tr', 'td', 'ul', 'li', 'ol', 'dt', 'dl', 'dd', "h1", "h2", "h3", "h4", "a", "img");
     private $default_junk_tags  = array( "style", "script", "noscript", "form", "button", "select"); 
     private $blkSize = 2;
     private $blksLen = array();
@@ -28,7 +28,14 @@ class WF_Extract {
         $this->engine = $engine;
     }
 
-    private function getTitleRegion(){}
+    public function getTitleRegion($html, $title){
+        $pos = false;
+        if ($title){
+            $pos = strpos($html, $title);
+        }
+        return $pos === false ? 0 : $pos;
+    }
+
     public function findPubDate($html, $title = '', $url='') { // code...  
         $len  = mb_strlen($html);
         $html = mb_substr($html, 0, $len/2);
@@ -62,7 +69,7 @@ class WF_Extract {
         mb_internal_encoding("utf-8");
         $title_len = mb_strlen($title_str);
         $html      = preg_replace("/<title>.*?<\/title>/", "", $html);
-        $html      = strip_tags($html);
+        //$html      = strip_tags($html, "<div><p>");
 
         $content_len = mb_strlen($html);
         $subtitle    = mb_substr($title_str, 0, $base_len);
@@ -106,24 +113,34 @@ class WF_Extract {
     }
     // }}}
 
-    //去掉标签和里面的内容
-    public function stripTotalTags($html, $junk_tags = null) {
+    //去掉标签和里面的内容, 如果single为true，则表示标签为img等自关闭标签
+    public function stripTotalTags($html, $junk_tags = null, $type = 'block') {
         $junk_tags = empty($junk_tags) ? $this->default_junk_tags : $junk_tags;
         $unused_tags = implode('|', $junk_tags);
-        $preg = '@<('.$unused_tags . ')[^>]*>.+?<\/\1>@is';
-        //! 注意有些写法将</script> 写成"</scr" + "ipt>" 可能会产生问题。目前将.*? 改成了.+?，但不保证问题不会发生。
+        if ($type == 'block'){
+            //! 注意有些写法将</script> 写成"</scr" + "ipt>" 可能会产生问题。目前将.*? 改成了.+?，但不保证问题不会发生。
+            $preg = '@<('.$unused_tags . ')[^>]*>.+?<\/\1>@is';
+        }
+        else if ($type == 'empty'){
+            $preg = '@<('.$unused_tags . ')[^>]*>\s*<\/\1>@is';
+        }
+        else if ($type == 'single'){
+            $preg = '@<(?:'.$unused_tags . ')[^>]*>@i';
+        }
         $html = preg_replace($preg, '', $html);
         return $html;
     }
 
     public function preProcess($html){
-        $html = $this->stripTotalTags($html);
         $html = $this->stripComments($html);
+        $html = $this->convertToUtf8($html);
+        $html = $this->stripTotalTags($html, array('script'), 'empty');
+        $html = $this->stripTotalTags($html);
+
         $html = $this->stripSpecialChars($html);
         $html = $this->stripDTD($html);
-        $html = $this->convertToUtf8($html);
-        $html = $this->stripTags($html);
-        $html = $this->stripSpace($html);
+        //$html = $this->stripTags($html);
+        //$html = $this->stripSpace($html);
         return $html;
     }
 
@@ -286,12 +303,67 @@ class WF_Extract {
         return $textLines;
     }
 
-    function readability($html){
+    public function findSource($html, $title, $url)
+    {
+        $html = $this->stripTotalTags($html, array('head'));
+        $pos  = $this->getTitleRegion($html, $title);
+        if ($pos > 0) {
+            $ret = preg_match('@<a [^>]+>([^<>]+(?:报|网))</a>@ums', substr($html, $pos, 600), $match);
+            if ($ret){
+                $source = $match[1];
+                if (mb_strlen($source) < 8) return $source;
+            }
+        }
+
+        $ret = preg_match("@http(?:s?)://([\w\.]+)@", $url, $match);
+        $source = $match[1];
+        return $source;
+    }
+
+    public function fixUrl($url, $baseurl){
+        $info = parse_url($baseurl);
+        $server = $info['schema'] . "://" . $info['host'];
+        $dirname= dirname($baseurl);
+
+        if (substr($url, 0, 1) == '/'){
+            $url = $server .'/'. $url;
+        }
+        else if (substr($url, 0, 7) == 'http://'){
+        }
+        else {
+            $url = $dirname . '/' . $url;
+        }
+        return $url;
+    }
+
+
+    public function findImage($html, $url){
+        $images = array();
+        $ret = preg_match_all('@<img [^>]*src=([\'"])([^\'"<>]+\.jp[e]?g)\1@mis', $html, $match);
+        if ($ret){
+            $images = $match[2];
+        }
+
+        foreach($images as $key => $image){
+            if (preg_match('/logo/',$image)){
+                unset($images[$key]);
+                continue;
+            }
+            $images[$key] = $this->fixUrl($image, $url);
+        }
+
+        return array_values($images);
+    }
+
+    public function readability($html){
         $obj = new Readability($html);
         return $obj->getContent();
     }
-
 }
+
+
+
+
 define("READABILITY_VERSION", 0.12);
 
 class Readability {
@@ -302,9 +374,7 @@ class Readability {
     const DOM_DEFAULT_CHARSET = "utf-8";
 
     // 当判定失败时显示的内容
-    const MESSAGE_CAN_NOT_GET = "Sorry, readability was unable to parse this page for content.  \n
-            If you feel like it should have been able to, 
-            please let me know by mail: lucky[at]gracecode.com";
+    const MESSAGE_CAN_NOT_GET = "原文提取失败";
 
     // DOM 解析类（PHP5 已内置）
     protected $DOM = null;
@@ -434,8 +504,8 @@ class Readability {
             } else if(preg_match(
                 "/((^|\\s)(post|hentry|entry[-]?(content|text|body)?|article[-]?(content|text|body)?)(\\s|$))/i",
                 $className)) {
-                $contentScore += 25;
-            }
+                    $contentScore += 25;
+                }
 
             // Look for a special ID
             if (preg_match("/(comment|meta|footer|footnote)/i", $id)) {
@@ -443,8 +513,8 @@ class Readability {
             } else if (preg_match(
                 "/^(post|hentry|entry[-]?(content|text|body)?|article[-]?(content|text|body)?)$/i",
                 $id)) {
-                $contentScore += 25;
-            }
+                    $contentScore += 25;
+                }
 
             // Add a point for the paragraph found
             // Add points for any commas within this paragraph

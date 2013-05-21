@@ -24,6 +24,8 @@ class WF_Daemon {
     private static $info_dir = null;
     private static $main_pid = 0;
     private static $options  = null;
+    private static $terminate=false;
+    private static $gc_enabled=null;
 
     public function __construct($options){
     }
@@ -84,6 +86,32 @@ class WF_Daemon {
         }
     }
 
+    static public function init(){
+       if ( ! function_exists('pcntl_signal_dispatch')) {
+            // PHP < 5.3 uses ticks to handle signals instead of pcntl_signal_dispatch
+            // call sighandler only every 10 ticks
+            declare(ticks = 10);
+        }
+
+        // Make sure PHP has support for pcntl
+        if ( ! function_exists('pcntl_signal')) {
+            $message = 'PHP does not appear to be compiled with the PCNTL extension.  This is neccesary for daemonization';
+            _log($message);
+            throw new Exception($message);
+        }
+
+        pcntl_signal(SIGTERM, array(__CLASS__, "signalHandler")); 
+        pcntl_signal(SIGINT, array(__CLASS__, "signalHandler")); 
+        pcntl_signal(SIGQUIT, array(__CLASS__, "signalHandler")); 
+
+        // Enable PHP 5.3 garbage collection
+        if (function_exists('gc_enable'))
+        {
+            gc_enable();
+            self::$gc_enabled = gc_enabled();
+        }
+    }
+
     static public function run($mode='worker', $options=array()){
         if (!isset($options['console']) || $options['console']){
             $options = self::getopt($options);
@@ -91,13 +119,13 @@ class WF_Daemon {
 
         if ($mode == 'pool'){
             self::daemonize($options);
-
             $workers_max = isset($options['workers_max']) ? $options['workers_max'] : 5;
+            self::init();
             self::runAsAutoPool($workers_max, $options);
         }
         else if($mode = 'worker'){
             self::daemonize($options);
-
+            self::init();
             $workers_count = isset($options['workers_count']) ? $options['workers_count'] : 1;
             self::runAsMainChildren($workers_count, $options);
         }
@@ -180,17 +208,61 @@ class WF_Daemon {
         return $result;
     }
 
+    static public function runAsSingle($config = array()){
+        $iterations = 0;
+        $config['before']();
+        while(true){
+            if (function_exists('pcntl_signal_dispatch')){
+                pcntl_signal_dispatch();
+            }
+            if (self::$terminate){
+                break;
+            }
+            $iterations ++ ;
+            $config['heartbeat']();
+            try {
+                $result = $config['loop']();
+            }
+            catch(Exception $e){
+                $result = $config['handle_exception']($e);
+                if (self::$exit_on_exception){
+                    break;
+                }
+            }
+            if ($result === false || $terminate){
+                break;
+            }
+            if ($iterations == $clean_interations){
+                $config['cleanup']($config);
+                $iterations = 0;
+            }
+        }
+        $config['after']();
+    }
+
+    static function cleanup(){
+        clearstatcache();
+        if (self::gc_enabled){
+            gc_collect_cycles();
+        }
+    }
+
     static public function runAsMainChildren($count=1, $options=array()){
         self::$workers_count = 0;
         $status = 0;
 
-        declare(ticks=1);
-        pcntl_signal(SIGTERM, array(__CLASS__, "signalHandler")); // kill all workers if send kill to main process
-        pcntl_signal(SIGCHLD, array(__CLASS__, "signalHandler")); 
-
         _log("daemon process is woring now");
+        pcntl_signal(SIGCHLD, array(__CLASS__, "signalHandler")); // if worker die, minus children num
 
         while(true){
+            if (function_exists('pcntl_signal_dispatch')){
+                pcntl_signal_dispatch();
+            }
+
+            if (self::$terminate){
+                break;
+            }
+
             $pid = -1;
             if (self::$workers_count < $count){
                 $pid = pcntl_fork();
@@ -200,6 +272,8 @@ class WF_Daemon {
                 self::$workers_count ++;
             }
             elseif ($pid == 0){
+                pcntl_signal(SIGTERM, SIG_DFL);
+                pcntl_signal(SIGCHLD, SIG_DFL);
                 if(isset($options['job_handler'])){
                     call_user_func($options['job_handler']);
                 }
@@ -221,13 +295,16 @@ class WF_Daemon {
         self::$workers_count = 0;
         $status = 0;
 
-        declare(ticks=1);
-        pcntl_signal(SIGTERM, array(__CLASS__, "signalHandler")); // kill all workers if send kill to main process
         pcntl_signal(SIGCHLD, array(__CLASS__, "signalHandler")); // if worker die, minus children num
         pcntl_signal(SIGUSR1, array(__CLASS__, "signalHandler")); // if send signal usr1 means busy
 
-
         while(true){
+            if (function_exists('pcntl_signal_dispatch')){
+                pcntl_signal_dispatch();
+            }
+            if (self::$terminate){
+                break;
+            }
             $pid = -1;
             if (self::$workers_count < self::$workers_min){
                 $pid = pcntl_fork();
@@ -237,6 +314,9 @@ class WF_Daemon {
                 self::$workers_count ++;
             }
             elseif ($pid == 0){
+                pcntl_signal(SIGTERM, SIG_DFL); 
+                pcntl_signal(SIGCHLD, SIG_DFL);
+                pcntl_signal(SIGUSR1, SIG_DFL);
                 if(isset($options['job_handler'])){
                     call_user_func($options['job_handler']);
                 }
@@ -253,6 +333,7 @@ class WF_Daemon {
                 }
             }
         }
+        self::mainQuit();
         exit(0);
     }
 
@@ -286,7 +367,7 @@ class WF_Daemon {
             case SIGTERM:
             case SIGHUP:
             case SIGQUIT:
-                self::mainQuit();
+                self::$terminate = true;
                 break;
             default:
                 return false;
@@ -378,23 +459,19 @@ class WF_Daemon {
     }
 
     public function printHelp(){
-        global $argv;
-        $script = $argv[0];
-        echo <<<HELP
-
-Usage:
-   php $script [options] 
-or 
-   php -f $script -- [options]
-    options:
-        -c <n>    -- children num
-        -m <n>    -- max children num
-        -u <user> -- run daemon script as <user>
-        -d <dir>  -- info dir
-        -p        -- use pid file
-        -o <file> -- output info to <file>
-        -h        -- print help
-HELP;
+        $script = basename(__FILE__);
+        echo "WF Daemon Manager Script\n\n";
+        echo "USAGE:\n";
+        echo "  # $script -h | [-c CHILDREN_NUM] [-o LOG_FILE] [-p] [-d INFO_DIR] [-u USER]\n\n";
+        echo "OPTIONS:\n";
+        echo "  -c <n>       Children num\n";
+        echo "  -m <n>       Max children num\n";
+        echo "  -u <user>    Run daemon script as <user>\n";
+        echo "  -d <dir>     Info dir\n";
+        echo "  -p           Use pid file\n";
+        echo "  -o <file>    Output info to <file>\n";
+        echo "  -h           Print help\n";
+        echo "\n";
     }
 }
 

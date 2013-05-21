@@ -124,9 +124,9 @@ class WF_Util{
         return self::serialize($data);
     }
 
-     public function explode($seperator, $str){
-         if ($str == '') return array();
-         return explode($seperator, $str);
-     }
+    public function explode($seperator, $str){
+        if ($str == '') return array();
+        return explode($seperator, $str);
+    }
 }
 ?>

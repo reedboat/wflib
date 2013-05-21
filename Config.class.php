@@ -40,4 +40,17 @@ class WF_Config {
         self::$_config = $config;
         return true;
     }
+
+    public function append($config = array()){
+        self::$_config = array_merge_recursive2(self::$_config, $config);
+    }
+}
+function array_merge_recursive2($paArray1, $paArray2)
+{
+    if (!is_array($paArray1) or !is_array($paArray2)) { return $paArray2; }
+    foreach ($paArray2 AS $sKey2 => $sValue2)
+    {
+        $paArray1[$sKey2] = array_merge_recursive2(@$paArray1[$sKey2], $sValue2);
+    }
+    return $paArray1;
 }
