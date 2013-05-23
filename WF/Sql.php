@@ -1,22 +1,14 @@
 <?php
 
-/**
- * Query 数据库操作工具类. 
- * 使用PDO扩展, 可支持多种数据库，方便使用，并防止SQL注入。
- *
- * @depends PDO
- * @version $id$
- * @author kufazhang <zhqm03@gmail.com>
- */
-class WF_Query {
+class WF_Table {
     private $conn = null;
     protected $table = '';
     public $primaryKey = 'id';
 
-    public function __construct($table, $db=null, $primaryKey = 'id')
+    public function __construct($table, $db, $primaryKey = 'id')
     {
-        $this->table = $table;
         $this->conn = $db;
+        $this->table = $table;
         $this->primaryKey = $primaryKey;
     }
 
@@ -24,8 +16,53 @@ class WF_Query {
         return $this->table;
     }
 
-    public function connect($dsn, $username='', $password='', $driver_options=array()){
+    private function connect($dsn, $username='', $password='', $driver_options=array()){
         $this->conn = new PDO($dsn, $username, $password, $driver_options);
+    }
+
+    public function execute($sql, $params=array()){
+        $logger = WF_Registry::get('logger');
+        $logger->debug("sql execute: '$sql (" . implode(', ', $params) . ")'");
+        if (!$this->conn) {
+            $logger = WF_Registry::get('logger');
+            $logger->error('connection not exist');
+            return false;
+        }
+
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt) {
+            $logger->error("sql prepare failed '$sql'");
+            $logger->error("db error:" . $this->conn->errorCode() . ' ' . json_encode($this->conn->errorInfo()));
+            return false;
+        }
+
+        $result = $stmt->execute($params);
+        if (!$result){
+            $logger->error("sql execute failed '$sql (" . implode(', ', $params) . ")'");
+            $logger->error("db error:" . $stmt->errorCode() . ' ' . json_encode($stmt->errorInfo()));
+        }
+        $stmt->closeCursor();
+        return $result;
+    }
+
+    public function query($sql, $params=array()){
+        $logger = WF_Registry::get('logger');
+        $logger->debug("sql query result: '$sql (" . implode(', ', $params) . ")' rowset count:");
+        if (!$this->conn) {
+            return false;
+        }
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt) {
+            $logger->error("sql prepare failed '$sql'");
+            $logger->error("db error:" . $this->conn->errorCode() . ' ' . json_encode($this->conn->errorInfo()));
+            return false;
+        }
+        $result = $stmt->execute($params);
+        if (!$result){
+            $logger->error("sql query failed '$sql (" . implode(', ', $params) . ")'");
+            $logger->error("db error:" . $stmt->errorCode() . ' ' . json_encode($stmt->errorInfo()));
+        }
+        return $stmt;
     }
 
     public function getPrimaryKey()
@@ -43,13 +80,6 @@ class WF_Query {
             return null;
     }
 
-    /**
-     * delete 删除记录
-     * 
-     * @param mixed $attributes 可为主键id或者字段数组
-     * @access public
-     * @return void
-     */
     public function delete($attributes){
         $sql = "DELETE FROM " . $this->tableName() . " WHERE ";
         $conditions = array();
@@ -68,7 +98,7 @@ class WF_Query {
     }
 
     /**
-     * update 更新记录
+     * update 
      * 
      * @param int|array $conditions 
      * @param array $attrs 
@@ -94,32 +124,17 @@ class WF_Query {
         return $result;
     }
 
-    /**
-     * insert 插入记录
-     * 
-     * @param mixed $attributes 字段数组
-     * @access public
-     * @return void
-     */
-    public function insert($attributes)
+    public function insert($arributes)
     {
         $sql = "insert into " . $this->tableName() . '(';
         $sql .= implode(',', array_keys($attributes));
         $sql .= ') values (';
         $sql .= implode(',', array_pad(array(), count($attributes), '?'));
         $sql .= ')';
-        $result = $this->execute($sql, array_values($attributes));
+        $result = $this->execute($sql, array_values($this->_attributes));
         return $result;
     }
 
-    /**
-     * findByPk 通过主键查询
-     * 
-     * @param mixed $pk 
-     * @param array $options 
-     * @access public
-     * @return void
-     */
     public function findByPk($pk, $options=array())
     {
         if (is_array($this->primaryKey))
@@ -166,20 +181,9 @@ class WF_Query {
             $conditions[] = "$col=?";
         }
         $sql.= implode(" AND ", $conditions);
-        $stmt = $this->query($sql, array_values($attributes));
-        $data = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : false;
-        if ($stmt){ $stmt->closeCursor(); }
-        return $data;
+        return $sql;
     }
 
-    /**
-     * findAll 通过多种条件查询，并可以使用排序、limit等。
-     * 
-     * @param array $condition 
-     * @param array $options 
-     * @access public
-     * @return void
-     */
     public function findAll($condition=array(), $options=array())
     {
         $sql = "select * from " .$this->tableName() . " ";
@@ -195,23 +199,9 @@ class WF_Query {
         {
             $sql .=" LIMIT {$condition['limit']}";
         }
-        $params = isset($condition['params']) ? $condition['params'] : array();
-        $stmt = $this->query($sql, $params);
-        $data = $stmt? $stmt->fetchAll(PDO::FETCH_ASSOC) : false;
-        if ($stmt){ $stmt->closeCursor(); }
-
-        return $data;
+        return $sql;
     } 
 
-    /**
-     * findAllBySql 通过sql语句查询
-     * 
-     * @param mixed $sql 
-     * @param mixed $data 
-     * @param array $options 
-     * @access public
-     * @return void
-     */
     public function findAllBySql($sql, $data, $options=array())
     {
         $stmt = $this->query($sql, $data);
@@ -219,53 +209,5 @@ class WF_Query {
         if ($stmt){ $stmt->closeCursor(); }
         return $data;
     }
-
-    /**
-     * execute 执行查询以外其他操作
-     * 
-     * @param mixed $sql 
-     * @param array $params 
-     * @access public
-     * @return void
-     */
-    public function execute($sql, $params=array()){
-        //echo "sql execute: '$sql (" . implode(', ', $params) . ")'" . "\n";
-        if (!$this->conn) {
-            return false;
-        }
-
-        $stmt = $this->conn->prepare($sql);
-        if (!$stmt) {
-            return false;
-        }
-
-        $result = $stmt->execute($params);
-        $stmt->closeCursor();
-        return $result;
-    }
-
-    /**
-     * query 查询
-     * 
-     * @param mixed $sql 
-     * @param array $params 
-     * @access public
-     * @return void
-     */
-    public function query($sql, $params=array()){
-        //echo "sql query result: '$sql (" . implode(', ', $params) . ")' rowset count:", "\n";
-        if (!$this->conn) {
-            return false;
-        }
-        $stmt = $this->conn->prepare($sql);
-        if (!$stmt) {
-            return false;
-        }
-        $result = $stmt->execute($params);
-        if (!$result){
-        }
-        return $stmt;
-    }
-
 }
 
