@@ -1,9 +1,9 @@
 <?php
 class WF_Loader{
-    private static $classDirs = array(__DIR__);
+    private static $classDirs = null;
 
     public static function registerAutoload(){
-        self::$classDirs = array(dirname(dirname(__FILE__)));
+        self::$classDirs = array(dirname(__FILE__));
         return spl_autoload_register(array(__CLASS__, 'autoload'));
     }
 
@@ -37,13 +37,6 @@ class WF_Loader{
 
         throw new RuntimeException($className . " cannot be finded");
         return false;
-    }
-
-    static public function addPath($path){
-        $pathes = (array)$path;
-        foreach($pathes as $path) {
-            array_unshift(sef::$classDirs, $path);
-        }
     }
 }
 ?>
