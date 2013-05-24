@@ -2,8 +2,10 @@
 class WF_Loader{
     private static $classDirs = array(__DIR__);
 
+    public static function init(){
+    }
+
     public static function registerAutoload(){
-        self::$classDirs = array(dirname(dirname(__FILE__)));
         return spl_autoload_register(array(__CLASS__, 'autoload'));
     }
 
@@ -23,7 +25,7 @@ class WF_Loader{
             $dirs = self::$classDirs;
         }
 
-        $script  = str_replace("_", '/', $className);
+        $script  = str_replace(array('WF_', "_"), array("", '/'), $className);
         foreach($dirs as $dir){
             $dir = rtrim($dir, '/\\');
             $file = $dir . '/' . $script . ".class.php";
