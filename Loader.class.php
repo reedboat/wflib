@@ -3,7 +3,7 @@ class WF_Loader{
     private static $classDirs = array();
 
     public static function registerAutoload(){
-        self::addPath(dirname(dirname(__FILE__)));
+        self::addPath(dirname(__FILE__));
         return spl_autoload_register(array(__CLASS__, 'autoload'));
     }
 
