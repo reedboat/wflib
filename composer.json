@@ -1,0 +1,11 @@
+{
+    "name" : "reedboat/wflib", 
+    "version": "2.0.1",
+    "authors" : [ {
+        "name": "reedboat",
+        "email": "zhqm03@gmail.com"
+    }],
+    "require": {
+        "php": ">=5.2.0"
+    }
+}
