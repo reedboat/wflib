@@ -26,7 +26,7 @@ class WF_Loader{
         $script  = str_replace("_", '/', $className);
         foreach($dirs as $dir){
             $dir = rtrim($dir, '/\\');
-            $file = $dir . '/' . $script . ".class.php";
+            $file = $dir . '/' . $script . ".php";
             if (file_exists($file)){
                 require $file;
                 if ( class_exists( $className ) ){
@@ -42,7 +42,7 @@ class WF_Loader{
     static public function addPath($path){
         $pathes = (array)$path;
         foreach($pathes as $path) {
-            array_unshift(sef::$classDirs, $path);
+            array_unshift(self::$classDirs, $path);
         }
     }
 }
