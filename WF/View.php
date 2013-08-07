@@ -8,6 +8,7 @@ class WF_View {
     private $layout_dir = "_layouts";
     private $helper_dir = "_helpers";
     private $partial_dir = "_partials";
+    private $base_path = "";
     private $suffix = '.tpl.php';
     private $layout = null;
     private $called = false;
@@ -29,6 +30,7 @@ class WF_View {
         $keys = array(
             'begin_mark', 'end_mark', 'suffix',
             'helper_dir', 'layout_dir', 'partial_dir',
+            'base_path',
         );
 
         foreach($keys as $key){

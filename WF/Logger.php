@@ -34,7 +34,7 @@ class WF_Logger{
      * @var string
      * @access private
      */
-    private $default_log_format = "%iso_datetime %level %msg\n";
+    private $default_log_format = "%iso_datetime %level %label %msg\n";
     private $log_format = '';
 
     private $priorities = array(
@@ -75,6 +75,15 @@ class WF_Logger{
             $this->backend = $clog;
         }
         elseif (is_string($clog)){
+            $time = time();
+            $replace = array(
+                '%date%'  => date('Ymd', $time),
+                '%year%'  => date('Y', $time),
+                '%month%' => date('m', $time),
+                '%day%'   => date('d', $time),
+                '%hour%'  => date('H', $time),
+            );
+            $clog = strtr($clog, $replace);
             if ($clog == 'stdout' || $clog == 'system'){
                 $this->backend = $clog;
             }
@@ -176,7 +185,7 @@ class WF_Logger{
     private function msg($msg, $level){
         $msg = $this->format($msg);
         if (!$this->log_format){
-            return str_replace(array('%iso_datetime', '%level', '%msg'), array(date('c'), $level, $msg), $this->default_log_format);
+            return str_replace(array('%iso_datetime', '%level',  '%label', '%msg'), array(date('c'), $level, $this->label, $msg), $this->default_log_format);
         }
         else {
             $placeholder = array('%iso_datetime', '%level', '%msg', '%datetime', '%ip', '%micro_time', '%label');
@@ -248,11 +257,11 @@ class WF_Logger{
      * @return void
      */
     public function dump($data, $trace=false){
-        $this->trace($data);
-        if (!$this->priorities[self::TRACE]) {
-            return;
-        }
-        echo $this->msg($msg, self::TRACE);
+        //$this->trace($data);
+        //if (!$this->priorities[self::TRACE]) {
+            //return;
+        //}
+        echo $this->msg($data, self::TRACE);
         if ($trace){
             debug_print_backtrace();
         }
@@ -312,4 +321,5 @@ class WF_Logger{
     }
 
 }
+
 ?>

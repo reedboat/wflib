@@ -42,6 +42,9 @@ class WF_Config {
     }
 
     public function append($config = array()){
+        if (!is_array($config)){
+            $config = array();
+        }
         self::$_config = array_merge_recursive2(self::$_config, $config);
     }
 }

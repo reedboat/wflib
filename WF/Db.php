@@ -71,10 +71,9 @@ class WF_Db {
     }
 
     public function execute($sql, $params=array()){
-        $logger = WF_Registry::get('logger');
+        $logger = WF_Logger::getLogger('sql');
         $logger->debug("sql execute: '$sql (" . implode(', ', $params) . ")'");
         if (!$this->conn) {
-            $logger = WF_Registry::get('logger');
             $logger->error('connection not exist');
             return false;
         }
@@ -96,7 +95,7 @@ class WF_Db {
     }
 
     public function query($sql, $params=array()){
-        $logger = WF_Registry::get('logger');
+        $logger = WF_Logger::getLogger('sql');
         $logger->debug("sql query result: '$sql (" . implode(', ', $params) . ")' rowset count:");
         if (!$this->conn) {
             return false;

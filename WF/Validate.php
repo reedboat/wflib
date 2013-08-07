@@ -22,30 +22,25 @@ class WF_Validate {
     private $rules = array();
     private $errors = array();
     private $messages = array(
-        'alnum'           => 'Please provide only alnum characters.',
-        'alpha'           => 'Please provide only alphabetic characters.',
-        'city'            => 'Please provide a valid city name.',
-        'date'            => 'Please provide a valid date.',
-        'dateISO'         => 'Please provide a valid ISO date.',
-        'dateGreaterThan' => 'Please provide a date that is before {date}.',
-        'email'           => 'Please provide a valid email address.',
-        'equalTo'         => 'Please provide the same value again.',
-        'float'           => 'Please provide a valid floating point number.',
-        'length'          => 'Please provide {length} characters.',
-        'max'             => 'Please provide a value less than or equal to {max}.',
-        'maxLength'       => 'Please provide no more than {maxLength} characters.',
-        'min'             => 'Please provide a value greater than or equal to {min}.',
-        'minLength'       => 'Please provide no fewer than {minLength} characters.',
-        'notEqualTo'      => 'Please provide a different value.',
-        'numeric'         => 'Please provide numbers only.',
-        'phone'           => 'Please provide a valid phone number.',
-        'phrase'          => 'Please provide a valid phrase.',
-        'required'        => 'This field is required.',
-        'url'             => 'Please provide a valid URL.',
-        'zip'             => 'Please provide a valid zip code.',
-        'choice'          => 'Please provide a valid value in {choice}.',
-        'list'            => 'Please provide a valid list value.',
-        'callback'        => 'Please provide a valid value',
+        'alnum'           => '只能包含字母或数字',
+        'alpha'           => '只能包含字母',
+        'numeric'         => '只能包含数字',
+        'num'             => '只能包含数字',
+        'date'            => '不是合法的日期',
+        'email'           => '不是合法的email',
+        'length'          => '只能包含{length}个字符',
+        'max'             => '不能大于{max}',
+        'maxLength'       => '不能超过{maxLength}个字符',
+        'min'             => '不得小于{min}',
+        'minLength'       => '不能少于{minLength}个字符',
+        'required'        => '必须要提供',
+        'url'             => '不是合法的URL',
+        'choice'          => '值必须在{choice}之内',
+        'list'            => '不是合法的列表,',
+        'callback'        => '不符合规则{callback}',
+        'boolean'         => '不是合法的布尔值',
+        'identifier'      => '不是合法的标识符',
+        'regexp'          => '不符合正则规则'
     );
 
     public function __construct($rules=array(), $msgs = null){
@@ -56,12 +51,12 @@ class WF_Validate {
         switch($type){
         case 'basic':
             $keys = implode(', ', array_keys($this->errors));
-            $msg = "Invalid Arguments ($keys)";
+            $msg = "参数错误($keys)";
             break;
         case 'normal':
-            $result = "";
+            $result = "参数错误: ";
             foreach($this->errors as $key => $error){
-                $result.= "Param \$$key error: " . $this->msg($error['rule']) . " \n";
+                $result.= "$key" . $this->msg($error['rule']) . ";\n";
             }
             $msg = $result;
             break;
@@ -126,6 +121,10 @@ class WF_Validate {
 
         foreach($data as $key => $value){
             $this->key = $key;
+            //如果值为空，视同该参数未传
+            if ($value === ''){
+                continue;
+            }
             $value     = is_string($value)? trim($value) : $value;
             if (!isset($this->rules[$key])){
                 continue;
@@ -396,9 +395,14 @@ class WF_Validate {
     }
 
     public function aBoolean($value){
-        //$value = strtolower($value);
-        //return $value == 1 || $value == 'true' || $value == 'on' || $value == 'yes';
-        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        if (is_string($value)){
+            $value = strtolower($value);
+        }
+        $valid_values = array(
+            true, 1, 'true', 'on', 'yes', 
+            false,0, 'false', 'off', 'no', 
+        );
+        return in_array($value, $valid_values);
     }
 
     public function notempty($value){

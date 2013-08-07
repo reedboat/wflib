@@ -517,5 +517,13 @@ class WF_Coll implements Iterator, ArrayAccess, Countable
         throw new LogicException(__('集合只能容纳 "%s" 类型的对象，而不是 "%s" 类型的值.', $this->_type, $type));
     }
 
+    /**
+     * 转换成数组形式
+     */
+    public function toArray()
+    {
+        return $this->_coll;
+    }
+
 }
 

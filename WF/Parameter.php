@@ -68,13 +68,13 @@ class WF_Parameter {
         return $filter;
     }
 
-    public function query($key, $default=null, $trim=true){
+    public function query($key, $default=null, $filter="trim"){
         $data = array_merge($_GET, $_POST);
-        return $this->retrieve($data, $key, $default, $trim);
+        return $this->retrieve($data, $key, $default, $filter);
     }
 
-    public function post($key, $default=null, $trim=true){
-        return $this->retrieve($_POST, $key, $default, $trim);
+    public function post($key, $default=null, $filter="trim"){
+        return $this->retrieve($_POST, $key, $default, $filter);
     }
 
     public function retrieve($data, $key, $default=null, $filter="trim"){
@@ -84,8 +84,8 @@ class WF_Parameter {
         return $default;
     }
 
-    public function get($key, $default=null, $trim=true){
-        return $this->retrieve($_GET, $key, $default, $trim);
+    public function get($key, $default=null, $filter='trim'){
+        return $this->retrieve($_GET, $key, $default, $filter);
     }
 
     public function cookie($key, $default=null){

@@ -31,20 +31,30 @@ class WF_Util{
         return preg_match($pattern, $ua);
     }
 
-    public static function array2xml($array,$encoding='utf8') {
+    public static function array2xml($array, $encoding='utf8', $root='response') {
         $xml = '<?xml version="1.0" encoding="'.$encoding.'"?>';
-        $xml.= '<response>';
+        $xml.= "<$root>";
         $xml.= self::_array2xml($array);
-        $xml.= "</response>";
+        $xml.= "</$root>";
         return $xml;
     }
 
-    private static function _array2xml($array) {
+    public static function _array2xml($array) {
+        if (!is_array($array)) return '';
         $xml = '';
         foreach($array as $key=>$val) {
-            is_numeric($key)&&$key="item id=\"$key\"";
+            if (is_numeric($key)){
+                $key = 'item';
+            }
             $xml.="<$key>";
-            $xml.=is_array($val)?self::_array2xml($val):htmlspecialchars($val);
+            if (is_array($val)){
+                $val = self::_array2xml($val);
+                $xml .= $val;
+            }
+            else {
+                $xml.= is_numeric($val) ? $val : "<![CDATA[" . $val . "]]>";
+            }
+
             list($key,)=explode(' ',$key);
             $xml.="</$key>";
         }

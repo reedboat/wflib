@@ -1,7 +1,15 @@
 <?php
+/**
+ * WF_Http Curl封装类。 
+ *
+ * 支持代码级别Hosts
+ * 支持设置Cookie
+ * 支持Json格式
+ */
 class WF_Http {
 
     private $params = array();
+    private $hosts = array();
     private $server = '';
 
     private $http_code  = 200;
@@ -56,6 +64,8 @@ class WF_Http {
         $params  = array_merge($this->params, (array)$params);
         $data    = http_build_query($params, '', '&');
 
+
+        //GET or POST
         $method = isset($options['method']) 
             ? strtoupper($options['method']) : $this->method;
         if ($method == 'GET'){
@@ -68,7 +78,23 @@ class WF_Http {
             curl_setopt($ch, CURLOPT_POSTFIELDS, $data); 
             curl_setopt($ch, CURLOPT_POST, true);
         }
+
         $this->url = $url;
+        $url_info = parse_url($url);
+        $host = $url_info['host'];
+
+        //指定访问特定的机器
+        if (isset($options['machine'])){
+            $ip = $options['machine'];
+        }
+        if (isset($this->hosts[$host])){
+            $ip = $this->hosts[$host];
+        }
+        if ($ip){
+            $url = str_replace($host, $this->hosts[$host], $url);
+            $this->setHeader('host', $host);
+        }
+
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_URL, $url); 
 
@@ -131,7 +157,22 @@ class WF_Http {
      public function setOption($key, $value){
          curl_setopt($this->ch, $key, $value);
      }
- 
+
+     public function setHeader($key, $value)
+     {
+         $pairs = is_array($key) ? $key : array($key=>$value);
+         $headers = array();
+         foreach($pairs as $key => $value){
+             $headers[] = ucfirst($key) . ": " . $value;
+         }
+         curl_setopt($this->ch, CURLOPT_HTTPHEADER, $headers);
+     }
+
+     public function setHosts($hosts)
+     {
+         $this->hosts = $hosts;
+     }
+
      public function reset(){
          $this->ch         = curl_init();
          $this->http_code  = 200;
